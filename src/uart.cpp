@@ -19,10 +19,10 @@ void publishMessage()
 {
   JsonDocument doc;
 
-  //// THIS SECTION SHOULD BE EDITED TO MATCH INCOMING PARAMS
+  //// THIS SECTION SHOULD BE EDITED TO MATCH INCOMING PARAMS /////////////////////
   int z = 0;
   int ti = millis();
-    while (Serial2.available()< NUMPARAM) { 
+    while (Serial2.available()< NUMPARAM) { // waits for data for all elemtns to be here
            
     if (millis()-ti > TIMEOUT_MS) { /// clears buffer if it was a timeout
       while (Serial2.available()) {
@@ -30,6 +30,7 @@ void publishMessage()
   }
   return; //   
     }
+
     }
         uint8_t c = Serial2.read();
         doc["c"] = c;
@@ -53,9 +54,7 @@ void publishMessage()
 while (Serial2.available()) {
     Serial2.read();
   }
-  char jsonBuffer[512];
-
-
+  char jsonBuffer[1024]; 
   /// 
 serializeJson(doc, jsonBuffer); // print to client
  
