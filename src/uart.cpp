@@ -1,10 +1,14 @@
+// Prathik Narsetty
+/*
+This file is to let the user dictate the type of data they are trying to push to the cloud via our pipeline
+*/
+
 #include "uart.h"
 
 #define AWS_IOT_PUBLISH_TOPIC   "esp32/pub"
 #define AWS_IOT_SUBSCRIBE_TOPIC "esp32/sub"
-
-  #define NUMPARAM 6
-  #define TIMEOUT_MS 1000
+#define NUMPARAM 6
+#define TIMEOUT_MS 1000
 
 WiFiClientSecure net = WiFiClientSecure();
 PubSubClient client(net);
