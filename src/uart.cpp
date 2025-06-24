@@ -4,11 +4,9 @@ This file is to let the user dictate the type of data they are trying to push to
 */
 
 #include "uart.h"
-
+#include "JSONFORMAT.h"
 #define AWS_IOT_PUBLISH_TOPIC   "esp32/pub"
 #define AWS_IOT_SUBSCRIBE_TOPIC "esp32/sub"
-#define NUMPARAM 6
-#define TIMEOUT_MS 1000
 
 WiFiClientSecure net = WiFiClientSecure();
 PubSubClient client(net);
@@ -32,23 +30,10 @@ void publishMessage()
     }
 
     }
-        uint8_t c = Serial2.read();
-        doc["c"] = c;
-    
-        uint8_t d = Serial2.read();
-        doc["d"] = d;
-    
-        uint8_t e = Serial2.read();
-        doc["e"] = e;
-    
-        uint8_t f = Serial2.read();
-        doc["f"] = f;
-    
-        uint8_t g = Serial2.read();
-        doc["g"] = g;
-    
-        uint8_t h = Serial2.read();
-        doc["h"] = h;
+
+
+    /// HERE!!!!
+    FIELD_LIST;
     
 
 while (Serial2.available()) {
