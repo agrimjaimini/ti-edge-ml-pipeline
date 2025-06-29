@@ -1,6 +1,6 @@
 # TI Fall Detection
 
-A basic fall detection system using Texas Instruments (TI) IWR6843AOP ACTIVE mmWave sensor. 
+A basic fall detection system using Texas Instruments (TI) IWRL6432AOPEVM mmWave sensor. 
 Utilizes a hybrid machine learning pipeline. 
 
 ## Features
