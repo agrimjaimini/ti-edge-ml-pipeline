@@ -1,12 +1,15 @@
-# TI Fall Detection
+# TI Edge ML Hybrid Pipeline
 
-A basic fall detection system using Texas Instruments (TI) IWRL6432AOPEVM mmWave sensor. 
-Utilizes a hybrid machine learning pipeline. 
+A real-time hybrid machine learning pipeline powered by the Texas Instruments (TI) IWRL6432AOPEVM mmWave sensor.
+Designed for efficient edge-to-cloud inference and event-driven processing. Currently implemented with a fall 
+detection use-case. 
 
-## Features
-- Real-time sensor monitoring
-- Simple fall detection logic
-- Alerts when a fall is detected
+Features
+	•	Real-time mmWave sensor data ingestion
+	•	Edge-triggered cloud pipeline via ESP32 and AWS Lambda
+	•	Deployed fall detection model using sequential point cloud data
+	•	WebSocket-based communication to backend inference service
+	•	Alerts and frontend updates triggered when a fall is detected
 
 ## Contributors
 - Agrim Jaimini — Cornell University
