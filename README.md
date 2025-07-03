@@ -1,4 +1,4 @@
-# TI Edge ML Hybrid Pipeline
+# TI Edge ML Pipeline
 
 A real-time hybrid machine learning pipeline powered by the Texas Instruments (TI) IWRL6432AOPEVM mmWave sensor.
 Designed for efficient edge-to-cloud inference and event-driven processing. Currently implemented with a fall 
