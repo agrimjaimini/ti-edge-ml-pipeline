@@ -56,12 +56,46 @@ void setup() {
 
 // global var
 uint32_t window = 0;
+uint16_t magicWord1 = 0;
 /////////////////////////////////////////////
 /// loop ///
 /////////////////////////////////////////////
 void loop() {
+
+  /*
+  Need to use sliding window everytime im jumping data
+  -> can use fixed size everytime Im fitting the data exactly 
+  */
+
+// need to align per packet as I am going to start adding more data also need to do sliding window
+   if (!Serial2.available()) return;
+
+    int b = Serial2.read();
+    if (b < 0) return;
+    magicWord1 = (magicWord1 << 8) | uint8_t(b);
+
+    // reconstruct
+    uint16_t rotatedMagicWord1 = ((magicWord1 & 0xFF00) >>  8)  | ((magicWord1 & 0x00FF) <<  8);
+// checks for all magic numbers
+    if (rotatedMagicWord1 != 0x0102) {
+      return;
+    } 
+    if (readUint16BE()!= 0x0304) {
+      return; 
+    }
+    if (readUint16BE()!= 0x0506) {
+      return; 
+    }
+    if (readUint16BE()!= 0x0708) {
+      return; 
+    }
+
+
+    while (1) {
+
     // shift in one byte for sliding window of UART data
     if (!Serial2.available()) return;
+
     int b = Serial2.read();
     if (b < 0) return;
     window = (window << 8) | uint8_t(b);
@@ -100,7 +134,7 @@ void loop() {
           "numDetectedPoints[0]=%u, [1]=%u, total=%u\n",
           MajorPoints, MinorPoints, totalPoints
         );
-        
+
         // 4) loop through each point
         for (uint16_t i = 0; i < totalPoints; i++) {
             int16_t x = readInt16BE();
@@ -115,5 +149,8 @@ void loop() {
               i, x, y, z, doppler, pointSnr, pointNoise
             );
         }
+        break;
     }
+    
+  }
 }
