@@ -39,7 +39,7 @@ void publishMessage()
 while (Serial2.available()) {
     Serial2.read();
   }
-  char jsonBuffer[1024]; 
+  char jsonBuffer[2048]; 
   /// 
 serializeJson(doc, jsonBuffer); // print to client
  
