@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "aws.h"
+#include "math.h"
 // //////////////////////////////////////////////////////////////////////////////
 // /// helper functions -> need to move into a seperate file later ///
 // //////////////////////////////////////////////////////////////////////////////
@@ -209,7 +210,7 @@ void loop() {
         sum2_x += dx*dx;
         sum2_y += dy*dy;
         sum2_z += dz*dz;
-        
+        sum2_snr += dsnr*dsnr;
     }
 
     // 3) compute SD
@@ -217,8 +218,29 @@ void loop() {
     x_sd = sqrt(sum2_x /(nPts-1));
     y_sd = sqrt(sum2_y /(nPts-1));
     z_sd = sqrt(sum2_z /(nPts-1));
+    if (x_sd>1 || y_sd>2 || z_sd >2)
+    snr_sd = sqrt(sum2_snr/(nPts-1));
 
-
+        float cx_pos [30] = {0};
+        float cy_pos [30] = {0};
+        float cz_pos [30] = {0};
+        float cSnr_arr [30] = {0};
+        // constructing a new array to only include the points witihn a sd of the center
+        int cPoints = 0; // num of new points
+        for (int i =0; i<nPts; i++) {
+          if (x_cen+ x_sd < x_pos[i]) {
+            if (x_cen-x_sd> x_pos[i]) {
+              Serial.print("no Motion");
+              break;
+            }
+          }
+           if (y_cen+ y_sd < y_pos[i]) {
+            if (y_cen-y_sd> y_pos[i]) {
+              Serial.print("no Motion");
+              break;
+            }
+          }         
+        }
 
 
 
