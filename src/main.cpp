@@ -1,11 +1,10 @@
-// // Prathik Narsetty
-
+// // // Prathik Narsetty
 #include <Arduino.h>
 #include "aws.h"
 #include "math.h"
-// //////////////////////////////////////////////////////////////////////////////
-// /// helper functions -> need to move into a seperate file later ///
-// //////////////////////////////////////////////////////////////////////////////
+// // //////////////////////////////////////////////////////////////////////////////
+// // /// helper functions -> need to move into a seperate file later ///
+// // //////////////////////////////////////////////////////////////////////////////
 
 //  Read Byte
 uint8_t readByte() {
@@ -177,70 +176,70 @@ void loop() {
               i, x, y, z, pointSnr, pointNoise
             );
             int nPts = min((int)totalPoints, 30);
-///////////////////////////////////////////////////////////
-/// Let me set this section for presence detection ///
-///////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////
+// /// Let me set this section for presence detection ///
+// ///////////////////////////////////////////////////////////
 
-  // let me calculate a center of all these points
-  float x_cen = 0;
-  float y_cen = 0;
-  float z_cen = 0;
-  float snr_cen = 0;
+//   // let me calculate a center of all these points
+//   float x_cen = 0;
+//   float y_cen = 0;
+//   float z_cen = 0;
+//   float snr_cen = 0;
 
-  float x_sd = 0;
-  float y_sd = 0;
-  float z_sd = 0;
-  float snr_sd = 0;
-  // want to value points with high SNR 
+//   float x_sd = 0;
+//   float y_sd = 0;
+//   float z_sd = 0;
+//   float snr_sd = 0;
+//   // want to value points with high SNR 
 
-        for (int i = 0; i<nPts; i++) {
-          x_cen+= x_pos[i]/nPts;
-          y_cen += y_pos[i]/nPts;
-          z_cen += z_pos[i]/nPts;
-          snr_cen += Snr_arr[i]/nPts;
-        }
+//         for (int i = 0; i<nPts; i++) {
+//           x_cen+= x_pos[i]/nPts;
+//           y_cen += y_pos[i]/nPts;
+//           z_cen += z_pos[i]/nPts;
+//           snr_cen += Snr_arr[i]/nPts;
+//         }
 
-            // 2) compute sum of squared deviations
-    float sum2_x = 0, sum2_y = 0, sum2_z = 0, sum2_snr;
-    for (int i = 0; i < nPts; ++i) {
-        float dx = x_pos[i] - x_cen;
-        float dy = y_pos[i] - y_cen;
-        float dz = z_pos[i] - z_cen;
-        float dsnr = Snr_arr[i] - snr_cen;
-        sum2_x += dx*dx;
-        sum2_y += dy*dy;
-        sum2_z += dz*dz;
-        sum2_snr += dsnr*dsnr;
-    }
+//             // 2) compute sum of squared deviations
+//     float sum2_x = 0, sum2_y = 0, sum2_z = 0, sum2_snr;
+//     for (int i = 0; i < nPts; ++i) {
+//         float dx = x_pos[i] - x_cen;
+//         float dy = y_pos[i] - y_cen;
+//         float dz = z_pos[i] - z_cen;
+//         float dsnr = Snr_arr[i] - snr_cen;
+//         sum2_x += dx*dx;
+//         sum2_y += dy*dy;
+//         sum2_z += dz*dz;
+//         sum2_snr += dsnr*dsnr;
+//     }
 
-    // 3) compute SD
-    // For a _population_ SD use nPts; for a _sample_ SD use (nPts-1)
-    x_sd = sqrt(sum2_x /(nPts-1));
-    y_sd = sqrt(sum2_y /(nPts-1));
-    z_sd = sqrt(sum2_z /(nPts-1));
-    if (x_sd>1 || y_sd>2 || z_sd >2)
-    snr_sd = sqrt(sum2_snr/(nPts-1));
+//     // 3) compute SD
+//     // For a _population_ SD use nPts; for a _sample_ SD use (nPts-1)
+//     x_sd = sqrt(sum2_x /(nPts-1));
+//     y_sd = sqrt(sum2_y /(nPts-1));
+//     z_sd = sqrt(sum2_z /(nPts-1));
+//     if (x_sd>1 || y_sd>2 || z_sd >2)
+//     snr_sd = sqrt(sum2_snr/(nPts-1));
 
-        float cx_pos [30] = {0};
-        float cy_pos [30] = {0};
-        float cz_pos [30] = {0};
-        float cSnr_arr [30] = {0};
-        // constructing a new array to only include the points witihn a sd of the center
-        int cPoints = 0; // num of new points
-        for (int i =0; i<nPts; i++) {
-          if (x_cen+ x_sd < x_pos[i]) {
-            if (x_cen-x_sd> x_pos[i]) {
-              Serial.print("no Motion");
-              break;
-            }
-          }
-           if (y_cen+ y_sd < y_pos[i]) {
-            if (y_cen-y_sd> y_pos[i]) {
-              Serial.print("no Motion");
-              break;
-            }
-          }         
-        }
+//         float cx_pos [30] = {0};
+//         float cy_pos [30] = {0};
+//         float cz_pos [30] = {0};
+//         float cSnr_arr [30] = {0};
+//         // constructing a new array to only include the points witihn a sd of the center
+//         int cPoints = 0; // num of new points
+//         for (int i =0; i<nPts; i++) {
+//           if (x_cen+ x_sd < x_pos[i]) {
+//             if (x_cen-x_sd> x_pos[i]) {
+//               Serial.print("no Motion");
+//               break;
+//             }
+//           }
+//            if (y_cen+ y_sd < y_pos[i]) {
+//             if (y_cen-y_sd> y_pos[i]) {
+//               Serial.print("no Motion");
+//               break;
+//             }
+//           }         
+//         }
 
 
 
@@ -251,6 +250,7 @@ void loop() {
               doc["Frame Count: "] = frameCounter;
               doc["Time Stamp: "] = millis();
               doc["Num Points: "] = totalPoints;
+              doc["Device ID: "] = 1; 
 
             JsonArray jx = doc["x_pos"].to<JsonArray>();
             JsonArray jy = doc["y_pos"].to<JsonArray>();
