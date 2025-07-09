@@ -4,11 +4,21 @@ from pathlib import Path
 from datetime import datetime
 
 # -------- CONFIG --------
-INPUT_LOG_FILE = "sample_swt.log"  # <-- your log file
-PEOPLE_COUNT = 0  # <-- SET THIS BEFORE EACH RUN
+INPUT_LOG_FILE = "data/logs/3people.log"
+PEOPLE_COUNT = 3
+
+# Start and end times in HH:MM:SS,mmm format (e.g., "18:57:52,747")
+START_TIME_STR = "19:35:23,457"
+END_TIME_STR   = "19:38:01,281"
 # ------------------------
 
-# Create unique output filename
+def time_str_to_millis(time_str):
+    dt = datetime.strptime(time_str, "%H:%M:%S,%f")
+    return dt.hour * 3600000 + dt.minute * 60000 + dt.second * 1000 + dt.microsecond // 1000
+
+START_MS = time_str_to_millis(START_TIME_STR)
+END_MS = time_str_to_millis(END_TIME_STR)
+
 now = datetime.now().strftime("%Y%m%d_%H%M%S")
 OUTPUT_JSON_FILE = f"{PEOPLE_COUNT}people_training_{now}.json"
 
@@ -17,7 +27,7 @@ with open(INPUT_LOG_FILE, "r") as f:
 
 frames = []
 frame_id = None
-timestamp = None
+timestamp_ms_of_day = None
 points = []
 point = {}
 in_major = False
@@ -42,21 +52,21 @@ for line in log_lines:
     if "frameNum" in line:
         match = re.search(r"'frameNum': (\d+)", line)
         if match:
-            if frame_id is not None:
-                frame = add_frame(frame_id, timestamp, points)
-                frames.append(frame)
+            if frame_id is not None and timestamp_ms_of_day is not None:
+                if START_MS <= timestamp_ms_of_day <= END_MS:
+                    frame = add_frame(frame_id, timestamp_ms_of_day, points)
+                    frames.append(frame)
             frame_id = int(match.group(1))
             points = []
-            timestamp = None  # Reset timestamp for new frame
+            timestamp_ms_of_day = None
 
-    match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})", line)
+    match = re.search(r"(\d{2}:\d{2}:\d{2},\d{3})", line)
     if match and "frame-parser" in line:
         try:
-            timestamp_str = match.group(1)
-            dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S,%f")
-            timestamp = int(dt.timestamp() * 1000)
+            time_part = match.group(1)
+            timestamp_ms_of_day = time_str_to_millis(time_part)
         except:
-            timestamp = None
+            timestamp_ms_of_day = None
 
     if "majorPoints = ListContainer" in line:
         in_major = True
@@ -74,7 +84,7 @@ for line in log_lines:
     elif "z_c =" in line:
         point["z_c"] = float(line.split("=")[1].strip())
     elif "v_c =" in line:
-        point["v_c"] = float(line.split("=")[1].strip())  
+        point["v_c"] = float(line.split("=")[1].strip())
     elif "snr_c =" in line:
         point["snr_c"] = float(line.split("=")[1].strip())
     elif "noise_c =" in line:
@@ -82,13 +92,14 @@ for line in log_lines:
         points.append(point)
         point = {}
 
-# Add the last frame even if it had no points
-if frame_id is not None:
-    frame = add_frame(frame_id, timestamp, points)
-    frames.append(frame)
+# Final frame
+if frame_id is not None and timestamp_ms_of_day is not None:
+    if START_MS <= timestamp_ms_of_day <= END_MS:
+        frame = add_frame(frame_id, timestamp_ms_of_day, points)
+        frames.append(frame)
 
 output_path = Path(OUTPUT_JSON_FILE)
 with open(output_path, "w") as f:
     json.dump(frames, f, indent=2)
 
-print(f"Parsed {len(frames)} frames and saved to '{OUTPUT_JSON_FILE}'")
+print(f"Parsed {len(frames)} frames between {START_TIME_STR} and {END_TIME_STR} into '{OUTPUT_JSON_FILE}'")
