@@ -4,7 +4,8 @@ from .model import PointNetClassifier
 
 # (A) Where the weights live
 HERE       = os.path.dirname(__file__)
-MODEL_PATH = os.path.join(HERE, "pointnet_occupancy.pth")
+REPO_ROOT  = os.path.abspath(os.path.join(HERE, "..", ".."))
+MODEL_PATH = os.path.join(REPO_ROOT, "pointnet_occupancy.pth")
 DEVICE     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 _model: PointNetClassifier = None
