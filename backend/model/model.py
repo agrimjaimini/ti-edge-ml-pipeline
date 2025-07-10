@@ -4,8 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-from data_collection.preprocessing import get_dataloaders
-
+from model.data_collection.preprocessing import get_dataloaders
 class TNet(nn.Module):
     def __init__(self, k=3):
         super().__init__()
@@ -125,4 +124,4 @@ if __name__ == '__main__':
         writer.add_scalar('Acc/Val',    val_acc,    epoch)
 
     # Save final model
-    torch.save(model.state_dict(), 'pointnet_radar.pth')
+    torch.save(model.state_dict(), 'pointnet_occupancy.pth')
