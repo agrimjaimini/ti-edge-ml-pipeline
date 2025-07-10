@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     writer = SummaryWriter(log_dir='runs/pointnet_radar')
 
-    epochs = 10
+    epochs = 3
     for epoch in range(1, epochs + 1):
         train_loss = train(model, train_loader, optimizer, criterion, device)
         val_loss, val_acc = evaluate(model, val_loader, criterion, device)
