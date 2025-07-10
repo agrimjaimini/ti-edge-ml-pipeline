@@ -1,51 +1,58 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from flask_sock import Sock
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from model.inference import predict_occupancy
 import json
 
-app = Flask(__name__)
-CORS(app)              # allow_origins="*"
+app = FastAPI()
 
-sock = Sock(app)       # add WebSocket support
+# Allow CORS for all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-clients: list = []
+# Track connected clients
+clients: list[WebSocket] = []
 
-@sock.route('/ws/occupancy')
-def occupancy_ws(ws):
-    """Dashboards connect here to receive live updates."""
-    clients.append(ws)
+class SensorPayload(BaseModel):
+    sensor_data: list[list[float]]
+
+@app.websocket("/ws/occupancy")
+async def occupancy_ws(websocket: WebSocket):
+    await websocket.accept()
+    clients.append(websocket)
     try:
         while True:
-            # just keep the connection open; ignore any incoming text
-            ws.receive()
-    except Exception:
-        clients.remove(ws)
+            # just keep the connection alive, discard any incoming message
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        clients.remove(websocket)
 
-@app.route('/occupancy', methods=['POST'])
-def occupancy_hook():
-    """
-    Called by your Lambda. Runs the model, then broadcasts to all WS clients.
-    """
-    payload = request.get_json()
-    # 1) Run inference
-    result = predict_occupancy(payload['sensor_data'])
-    # 2) Broadcast
+@app.post("/occupancy")
+async def occupancy_hook(payload: SensorPayload):
+    result = predict_occupancy(payload.sensor_data)
     text = json.dumps(result)
-    dead = []
-    for ws in clients:
+
+    dead_clients = []
+    for client in clients:
         try:
-            ws.send(text)
+            await client.send_text(text)
         except Exception:
-            dead.append(ws)
-    for ws in dead:
-        clients.remove(ws)
+            dead_clients.append(client)
 
-    return jsonify(status="ok", sent_to=len(clients))
+    for client in dead_clients:
+        clients.remove(client)
 
-@app.route('/', methods=['GET'])
-def home():
+    return JSONResponse(content={"status": "ok", "sent_to": len(clients)})
+
+@app.get("/")
+async def home():
     return "hello"
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
