@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-from model.data_collection.preprocessing import get_dataloaders
+from data_collection.preprocessing import get_dataloaders
 class TNet(nn.Module):
     def __init__(self, k=3):
         super().__init__()
