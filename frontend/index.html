@@ -1,13 +1,57 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <title>Occupancy Dashboard</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    #status { margin-bottom: 1rem; }
+    #messages { list-style: none; padding: 0; }
+    #messages li { 
+      margin: 0.5rem 0; 
+      padding: 0.5rem; 
+      background: #f0f0f0; 
+      border-radius: 4px; 
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Occupancy Dashboard</h1>
+  <div id="status">Connecting…</div>
+  <ul id="messages"></ul>
+
+  <script>
+    // adjust port here if you’re running on 8080 or 80 etc.
+    const WS_URL = 'ws://3.145.14.56:8080/ws/occupancy';
+    const statusEl = document.getElementById('status');
+    const messagesEl = document.getElementById('messages');
+
+    const ws = new WebSocket(WS_URL);
+
+    ws.addEventListener('open', () => {
+      statusEl.textContent = '🟢 Connected';
+    });
+
+    ws.addEventListener('message', event => {
+      const data = JSON.parse(event.data);
+      const li = document.createElement('li');
+      li.textContent = JSON.stringify(data);
+      messagesEl.appendChild(li);
+      // auto‐scroll to latest
+      messagesEl.lastChild.scrollIntoView();
+    });
+
+    ws.addEventListener('close', () => {
+      statusEl.textContent = '🔴 Disconnected';
+    });
+
+    ws.addEventListener('error', err => {
+      statusEl.textContent = '⚠️ Error';
+      console.error('WebSocket error:', err);
+    });
+  </script>
+
+</body>
 </html>
