@@ -21,20 +21,17 @@ class RadarPayload(BaseModel):
     x_pos:    List[float]
     y_pos:    List[float]
     z_pos:    List[float]
-    snr:      List[float]    # you can keep these if you ever want to visualize or extend
+    snr:      List[float]
     noise:    List[float]
-    # you can ignore Frame Count, Time Stamp, Num Points if you like:
-    # frame_count:   int = Field(..., alias="Frame Count: ")
-    # time_stamp:    int = Field(..., alias="Time Stamp: ")
-    # num_points:    int = Field(..., alias="Num Points: ")
 
     def to_sensor_data(self) -> List[List[float]]:
-        # zip x,y,z into a list of [x,y,z] points
+        """Convert radar data to sensor data format."""
         return [[self.x_pos[i], self.y_pos[i], self.z_pos[i]]
                 for i in range(len(self.x_pos))]
 
-@app.websocket("/ws/occupancy")
-async def occupancy_ws(websocket: WebSocket):
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Handle WebSocket connections."""
     await websocket.accept()
     clients.append(websocket)
     try:
@@ -43,29 +40,44 @@ async def occupancy_ws(websocket: WebSocket):
     except WebSocketDisconnect:
         clients.remove(websocket)
 
-@app.post("/occupancy")
-async def occupancy_hook(payload: RadarPayload):
-    # 1) turn the radar JSON into the simple [[x,y,z],…] shape your model expects
-    sensor_data = payload.to_sensor_data()
-
-    # 2) run inference
-    result = predict_occupancy(sensor_data)
-
-    # 3) broadcast to all WS clients
-    text = json.dumps(result)
+async def broadcast_to_clients(message: str):
+    """Send message to all connected clients and clean up dead connections."""
     dead = []
     for ws in clients:
         try:
-            await ws.send_text(text)
+            await ws.send_text(message)
         except:
             dead.append(ws)
     for ws in dead:
         clients.remove(ws)
 
-    return JSONResponse(content={"status": "ok", "sent_to": len(clients)})
+@app.post("/occupancy")
+async def occupancy_hook(payload: RadarPayload):
+    """Process radar data and broadcast results to WebSocket clients."""
+    sensor_data = payload.to_sensor_data()
+
+    result = predict_occupancy(sensor_data)
+
+    combined_message = json.dumps({
+        "occupancy": result,
+        "point_data": {
+            "x_pos": payload.x_pos,
+            "y_pos": payload.y_pos,
+            "z_pos": payload.z_pos,
+            "snr": payload.snr,
+            "noise": payload.noise
+        }
+    })
+    await broadcast_to_clients(combined_message)
+
+    return JSONResponse(content={
+        "status": "ok", 
+        "clients": len(clients)
+    })
 
 @app.get("/")
 async def home():
+    """Return simple home page."""
     return "hello"
 
 if __name__ == "__main__":
