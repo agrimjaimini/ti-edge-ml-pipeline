@@ -10,7 +10,7 @@ DEVICE     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 _model: PointNetClassifier = None
 
-def _load_model(num_classes=4) -> PointNetClassifier:
+def _load_model(num_classes=5) -> PointNetClassifier:
     global _model
     if _model is None:
         m = PointNetClassifier(num_classes=num_classes)
@@ -34,10 +34,10 @@ def predict_occupancy(sensor_data: list[list[float]]) -> dict:
     sensor_data: list of [x,y,z] points for one frame
     returns: {
       'predicted_count': int,
-      'probabilities': [p0, p1, p2, p3]  # sum to 1
+      'probabilities': [p0, p1, p2, p3, p4]  # sum to 1
     }
     """
-    model = _load_model(num_classes=4)
+    model = _load_model(num_classes=5)
 
     pts = np.array(sensor_data, dtype=np.float32)      # (M,3)
     pts_fixed = _sample_or_pad(pts, num_points=128)    # (128,3)
@@ -45,7 +45,7 @@ def predict_occupancy(sensor_data: list[list[float]]) -> dict:
     x = x.unsqueeze(0).to(DEVICE)                      # → (1,128,3)
 
     with torch.no_grad():
-        logits = model(x)                              # (1,4)
+        logits = model(x)                              # (1,5)
         probs  = torch.softmax(logits, dim=1)[0].cpu().numpy()
 
     pred_count = int(probs.argmax())

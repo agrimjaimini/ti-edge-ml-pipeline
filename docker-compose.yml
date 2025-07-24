@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  app:
+    image: agrimjaimini/ti-edge-ml-pipeline:latest
+    platform: linux/amd64
+    ports:
+      - "8080:8080" 

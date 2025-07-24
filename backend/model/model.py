@@ -107,13 +107,13 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_loader, val_loader = get_dataloaders('data/json', batch_size=32, num_points=128)
 
-    model = PointNetClassifier(num_classes=4).to(device)
+    model = PointNetClassifier(num_classes=5).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.CrossEntropyLoss()
 
     writer = SummaryWriter(log_dir='runs/pointnet_radar')
 
-    epochs = 10
+    epochs = 50
     for epoch in range(1, epochs + 1):
         train_loss = train(model, train_loader, optimizer, criterion, device)
         val_loss, val_acc = evaluate(model, val_loader, criterion, device)
