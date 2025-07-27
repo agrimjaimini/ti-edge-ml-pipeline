@@ -2,9 +2,9 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "rec
 
 export default function ProbabilityBarChart({ probabilities, smoothedProbabilities }) {
   const data = probabilities.map((p, index) => ({
-    name: `Class ${index + 1}`,
-    current: p,
-    smoothed: smoothedProbabilities[index] || p,
+    name: `${index} People`,
+    raw: p,
+    smoothed: smoothedProbabilities?.[index] || p
   }));
 
   return (
@@ -13,16 +13,14 @@ export default function ProbabilityBarChart({ probabilities, smoothedProbabiliti
       <BarChart width={500} height={400} data={data}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" />
-        <YAxis domain={[0, 1]} />
+        <YAxis domain={[0, 1]} tickFormatter={(value) => `${(value * 100)}%`} />
         <Tooltip 
-          formatter={(value, name) => [
-            `${(value * 100).toFixed(1)}%`, 
-            name === 'current' ? 'Current' : 'Smoothed'
-          ]}
+          formatter={(value) => `${(value * 100).toFixed(1)}%`}
+          labelStyle={{ color: '#666' }}
         />
         <Legend />
-        <Bar dataKey="current" fill="#3182ce" name="Current" />
-        <Bar dataKey="smoothed" fill="#9f7aea" name="Smoothed (EMA)" />
+        <Bar dataKey="raw" fill="#3182ce" name="Raw Probability" />
+        <Bar dataKey="smoothed" fill="#34d399" name="Smoothed Probability" />
       </BarChart>
     </div>
   );
