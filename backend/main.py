@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import List
 from model.inference import predict_occupancy
 import json
+from fall_detection.inference.fall_detector import FallDetector
 
 app = FastAPI()
 
@@ -13,6 +14,12 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+fall_detector = FallDetector(
+    model_path="pointnet_lstm_fall_final.pth",
+    sequence_length=20,
+    num_points=128
 )
 
 clients: List[WebSocket] = []
@@ -25,13 +32,11 @@ class RadarPayload(BaseModel):
     noise:    List[float]
 
     def to_sensor_data(self) -> List[List[float]]:
-        """Convert radar data to sensor data format."""
         return [[self.x_pos[i], self.y_pos[i], self.z_pos[i]]
                 for i in range(len(self.x_pos))]
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """Handle WebSocket connections."""
     await websocket.accept()
     clients.append(websocket)
     try:
@@ -41,7 +46,6 @@ async def websocket_endpoint(websocket: WebSocket):
         clients.remove(websocket)
 
 async def broadcast_to_clients(message: str):
-    """Send message to all connected clients and clean up dead connections."""
     dead = []
     for ws in clients:
         try:
@@ -53,7 +57,6 @@ async def broadcast_to_clients(message: str):
 
 @app.post("/occupancy")
 async def occupancy_hook(payload: RadarPayload):
-    """Process radar data and broadcast results to WebSocket clients."""
     sensor_data = payload.to_sensor_data()
 
     result = predict_occupancy(sensor_data)
@@ -75,9 +78,34 @@ async def occupancy_hook(payload: RadarPayload):
         "clients": len(clients)
     })
 
+@app.post("/fall")
+async def fall_hook(payload: RadarPayload):
+    fall_result = fall_detector.process_frame({
+        "x_pos": payload.x_pos,
+        "y_pos": payload.y_pos,
+        "z_pos": payload.z_pos
+    })
+
+    if fall_result:
+        message = json.dumps({
+            "fall_detection": fall_result,
+            "point_data": {
+                "x_pos": payload.x_pos,
+                "y_pos": payload.y_pos,
+                "z_pos": payload.z_pos,
+                "snr": payload.snr,
+                "noise": payload.noise
+            }
+        })
+        await broadcast_to_clients(message)
+
+    return JSONResponse(content={
+        "status": "ok",
+        "clients": len(clients)
+    })
+
 @app.get("/")
 async def home():
-    """Return simple home page."""
     return "hello"
 
 if __name__ == "__main__":
