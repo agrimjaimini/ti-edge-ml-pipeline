@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from .data_collection.preprocessing import get_dataloaders
+import random
+
 class TNet(nn.Module):
     def __init__(self, k=3):
         super().__init__()
@@ -49,10 +51,10 @@ class PointNetClassifier(nn.Module):
 
         self.fc1 = nn.Linear(1024, 512)
         self.bn4 = nn.BatchNorm1d(512)
-        self.drop1 = nn.Dropout(p=0.3)
+        self.drop1 = nn.Dropout(p=0.5)
         self.fc2 = nn.Linear(512, 256)
         self.bn5 = nn.BatchNorm1d(256)
-        self.drop2 = nn.Dropout(p=0.3)
+        self.drop2 = nn.Dropout(p=0.5)
         self.fc3 = nn.Linear(256, num_classes)
 
     def forward(self, x):
@@ -75,7 +77,7 @@ class PointNetClassifier(nn.Module):
         x = self.fc3(x)
         return x
 
-def train(model, loader, optimizer, criterion, device):
+def train(model, loader, optimizer, criterion, device, reg_weight=0.001):
     model.train()
     running_loss = 0.0
     for points, labels in loader:
@@ -83,6 +85,22 @@ def train(model, loader, optimizer, criterion, device):
         optimizer.zero_grad()
         outputs = model(points)
         loss = criterion(outputs, labels)
+        # Transform regularization
+        reg_loss = 0.0
+        if hasattr(model, 'input_tnet') and hasattr(model, 'feature_tnet'):
+            # Forward through TNet to get matrices
+            x = points.transpose(2,1)
+            trans = model.input_tnet(x)
+            I3 = torch.eye(3).to(trans.device).unsqueeze(0)
+            diff3 = torch.bmm(trans, trans.transpose(1,2)) - I3
+            reg_loss += torch.mean(torch.norm(diff3, dim=(1,2))**2)
+            x = torch.bmm(trans, x)
+            x = torch.relu(model.bn1(model.conv1(x)))
+            trans_feat = model.feature_tnet(x)
+            I64 = torch.eye(64).to(trans_feat.device).unsqueeze(0)
+            diff64 = torch.bmm(trans_feat, trans_feat.transpose(1,2)) - I64
+            reg_loss += torch.mean(torch.norm(diff64, dim=(1,2))**2)
+        loss = loss + reg_weight * reg_loss
         loss.backward()
         optimizer.step()
         running_loss += loss.item() * points.size(0)
@@ -108,20 +126,24 @@ if __name__ == '__main__':
     train_loader, val_loader = get_dataloaders('data/json', batch_size=32, num_points=128)
 
     model = PointNetClassifier(num_classes=5).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
-
     writer = SummaryWriter(log_dir='runs/pointnet_radar')
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
 
-    epochs = 50
+    epochs = 35
+    best_val_loss = float('inf')
     for epoch in range(1, epochs + 1):
         train_loss = train(model, train_loader, optimizer, criterion, device)
         val_loss, val_acc = evaluate(model, val_loader, criterion, device)
+        scheduler.step()
 
         print(f'Epoch {epoch:02d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}')
         writer.add_scalar('Loss/Train', train_loss, epoch)
         writer.add_scalar('Loss/Val',   val_loss,   epoch)
         writer.add_scalar('Acc/Val',    val_acc,    epoch)
 
-    # Save final model
+        # Save best model
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
     torch.save(model.state_dict(), 'pointnet_occupancy.pth')

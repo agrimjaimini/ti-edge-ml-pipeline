@@ -4,12 +4,12 @@ from pathlib import Path
 from datetime import datetime
 
 # -------- CONFIG --------
-INPUT_LOG_FILE = "data/logs/3people.log"
-PEOPLE_COUNT = 3
+INPUT_LOG_FILE = "data/logs/0pA.log"
+PEOPLE_COUNT = 0
 
 # Start and end times in HH:MM:SS,mmm format (e.g., "18:57:52,747")
-START_TIME_STR = "19:35:23,457"
-END_TIME_STR   = "19:38:01,281"
+START_TIME_STR = "18:33:01,191"
+END_TIME_STR   = "18:43:11,715"
 # ------------------------
 
 def time_str_to_millis(time_str):
@@ -22,7 +22,7 @@ END_MS = time_str_to_millis(END_TIME_STR)
 now = datetime.now().strftime("%Y%m%d_%H%M%S")
 OUTPUT_JSON_FILE = f"{PEOPLE_COUNT}people_training_{now}.json"
 
-with open(INPUT_LOG_FILE, "r") as f:
+with open(INPUT_LOG_FILE, "r", encoding="utf-8", errors="ignore") as f:
     log_lines = f.readlines()
 
 frames = []
