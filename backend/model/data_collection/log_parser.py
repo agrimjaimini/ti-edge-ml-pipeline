@@ -8,7 +8,7 @@ INPUT_LOG_FILE = "data/logs/0pA.log"
 PEOPLE_COUNT = 0
 
 # Start and end times in HH:MM:SS,mmm format (e.g., "18:57:52,747")
-START_TIME_STR = "18:33:01,191"
+START_TIME_STR = "18:33:01,192"
 END_TIME_STR   = "18:43:11,715"
 # ------------------------
 
