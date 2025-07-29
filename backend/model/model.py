@@ -37,7 +37,7 @@ class TNet(nn.Module):
         return mat
 
 class PointNetClassifier(nn.Module):
-    def __init__(self, num_classes=4):
+    def __init__(self, num_classes):
         super().__init__()
         self.input_tnet = TNet(k=3)
         self.conv1 = nn.Conv1d(3, 64, 1)
@@ -121,29 +121,48 @@ def evaluate(model, loader, criterion, device):
             total += labels.size(0)
     return loss_sum / len(loader.dataset), correct / total
 
-if __name__ == '__main__':
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    train_loader, val_loader = get_dataloaders('data/json', batch_size=32, num_points=128)
+def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_size: int, learning_rate: float, weight_decay: float):
 
-    model = PointNetClassifier(num_classes=5).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    train_loader, val_loader = get_dataloaders(data_dir, batch_size, num_points=128)
+    model = PointNetClassifier(num_classes).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     criterion = nn.CrossEntropyLoss()
-    writer = SummaryWriter(log_dir='runs/pointnet_radar')
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
 
-    epochs = 35
-    best_val_loss = float('inf')
     for epoch in range(1, epochs + 1):
         train_loss = train(model, train_loader, optimizer, criterion, device)
         val_loss, val_acc = evaluate(model, val_loader, criterion, device)
         scheduler.step()
 
         print(f'Epoch {epoch:02d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}')
-        writer.add_scalar('Loss/Train', train_loss, epoch)
-        writer.add_scalar('Loss/Val',   val_loss,   epoch)
-        writer.add_scalar('Acc/Val',    val_acc,    epoch)
 
-        # Save best model
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-    torch.save(model.state_dict(), 'pointnet_occupancy.pth')
+    torch.save(model.state_dict(), f'models/{name}.pth')
+    
+
+# if __name__ == '__main__':
+#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#     train_loader, val_loader = get_dataloaders('data/json', batch_size=32, num_points=128)
+
+#     model = PointNetClassifier(num_classes=5).to(device)
+#     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+#     criterion = nn.CrossEntropyLoss()
+#     writer = SummaryWriter(log_dir='runs/pointnet_radar')
+#     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
+
+#     epochs = 35
+#     best_val_loss = float('inf')
+#     for epoch in range(1, epochs + 1):
+#         train_loss = train(model, train_loader, optimizer, criterion, device)
+#         val_loss, val_acc = evaluate(model, val_loader, criterion, device)
+#         scheduler.step()
+
+#         print(f'Epoch {epoch:02d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}')
+#         writer.add_scalar('Loss/Train', train_loss, epoch)
+#         writer.add_scalar('Loss/Val',   val_loss,   epoch)
+#         writer.add_scalar('Acc/Val',    val_acc,    epoch)
+
+#         # Save best model
+#         if val_loss < best_val_loss:
+#             best_val_loss = val_loss
+#     torch.save(model.state_dict(), 'pointnet_occupancy.pth')

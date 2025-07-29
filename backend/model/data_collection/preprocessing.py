@@ -11,13 +11,15 @@ def load_all_frames(data_dir):
     """
     Load every frame from every JSON and return
     two lists: clouds (N_i x 3 arrays) and labels.
+    
+    Args:
+        data_dir (str): Directory containing JSON files
+        label_field (str): Field name to use as label (default: 'people_count')
     """
     clouds = []
     labels = []
-    files = sorted(glob(os.path.join(data_dir, '*.json')))
+    files = sorted(glob(os.path.join(f'data/{data_dir}', '*.json')))
     for path in files:
-        # filename like "0people.json" → label 0
-        label = int(os.path.basename(path).split('people')[0])
         with open(path, 'r') as f:
             frames = json.load(f)
         for frame in frames:
@@ -27,7 +29,7 @@ def load_all_frames(data_dir):
                 frame['z_pos']
             ], axis=1)  # shape (Ni, 3)
             clouds.append(xyz)
-            labels.append(label)
+            labels.append(frame['label'])
     return clouds, labels
 
 class RadarDataset(Dataset):
