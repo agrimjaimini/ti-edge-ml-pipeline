@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fall Detection Monitor</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .fall-alert {
+            background-color: #fff3cd;
+            color: #856404;
+            display: none;
+        }
+        #pointPlot {
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .detection-status {
+            font-size: 24px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        .no-fall {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .fall {
+            background-color: #f8d7da;
+            color: #721c24;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0.8; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fall Detection Monitor</h1>
+        
+        <div id="connectionStatus" class="status disconnected">
+            Disconnected
+        </div>
+
+        <div id="detectionStatus" class="detection-status no-fall">
+            NO FALL DETECTED
+        </div>
+
+        <div class="stats">
+            <div class="stat-box">
+                <h3>Points Detected</h3>
+                <div id="pointCount">0</div>
+            </div>
+            <div class="stat-box">
+                <h3>Fall Probability</h3>
+                <div id="fallProb">0%</div>
+            </div>
+        </div>
+
+        <div id="pointPlot"></div>
+    </div>
+
+    <script>
+        // Initialize plot
+        const layout = {
+            scene: {
+                aspectmode: 'cube',
+                xaxis: { range: [-2, 2] },
+                yaxis: { range: [0, 4] },
+                zaxis: { range: [-2, 2] },
+                camera: {
+                    eye: { x: 1.5, y: 1.5, z: 1.5 }
+                }
+            },
+            margin: { l: 0, r: 0, t: 0, b: 0 }
+        };
+
+        Plotly.newPlot('pointPlot', [{
+            type: 'scatter3d',
+            mode: 'markers',
+            marker: {
+                size: 5,
+                color: 'rgb(23, 190, 207)'
+            },
+            x: [], y: [], z: []
+        }], layout);
+
+        // WebSocket connection
+        const connectWebSocket = () => {
+            const ws = new WebSocket('ws://localhost:8000/ws');
+            const statusDiv = document.getElementById('connectionStatus');
+            const detectionStatus = document.getElementById('detectionStatus');
+            const pointCount = document.getElementById('pointCount');
+            const fallProb = document.getElementById('fallProb');
+
+            ws.onopen = () => {
+                statusDiv.textContent = 'Connected';
+                statusDiv.className = 'status connected';
+            };
+
+            ws.onclose = () => {
+                statusDiv.textContent = 'Disconnected - Reconnecting...';
+                statusDiv.className = 'status disconnected';
+                setTimeout(connectWebSocket, 1000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket Error:', error);
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                // Update point cloud plot
+                if (data.point_data) {
+                    const update = {
+                        x: [data.point_data.x_pos],
+                        y: [data.point_data.y_pos],
+                        z: [data.point_data.z_pos]
+                    };
+                    Plotly.update('pointPlot', update);
+                    pointCount.textContent = data.point_data.x_pos.length;
+                }
+
+                // Handle fall detection
+                if (data.fall_detection) {
+                    const isFall = data.fall_detection.is_fall;
+                    detectionStatus.textContent = isFall ? 'FALL DETECTED!' : 'NO FALL DETECTED';
+                    detectionStatus.className = `detection-status ${isFall ? 'fall' : 'no-fall'}`;
+                    fallProb.textContent = `${(data.fall_detection.fall_probability * 100).toFixed(1)}%`;
+                }
+            };
+        };
+
+        // Start WebSocket connection
+        connectWebSocket();
+    </script>
+</body>
+</html> 

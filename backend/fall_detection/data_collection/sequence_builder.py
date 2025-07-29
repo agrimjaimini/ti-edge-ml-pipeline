@@ -3,14 +3,16 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 class SequenceBuilder:
-    def __init__(self, sequence_length: int = 20, frame_variations: int = 3):
+    def __init__(self, sequence_length: int = 30, frame_variations: int = 0, no_fall_slide: int = 30):
         """
         Initialize sequence builder
         sequence_length: number of frames per sequence
         frame_variations: number of frame variations before/after fall (+/-)
+        no_fall_slide: number of frames to skip for no-fall sequences
         """
         self.sequence_length = sequence_length
         self.frame_variations = frame_variations
+        self.no_fall_slide = no_fall_slide
         
     def find_nearest_frame(self, frames: List[Dict], timestamp_ms: int) -> int:
         """Find index of frame closest to timestamp"""
@@ -32,23 +34,37 @@ class SequenceBuilder:
     
     def build_no_fall_sequences(self, input_json: str, output_json: str):
         """
-        Create sequences from normal activity using sliding window
+        Create sequences from normal activity using sliding window with skip
         """
         # Load frames
         with open(input_json, 'r') as f:
             frames = json.load(f)
             
         sequences = []
-        # Slide window over frames
-        for i in range(0, len(frames) - self.sequence_length + 1):
+        # If no_fall_slide is 0, use step size of 1
+        step = max(1, self.no_fall_slide)
+        
+        # Slide window over frames with skip
+        for i in range(0, len(frames) - self.sequence_length + 1, step):
             sequence = self.create_sequence(frames, i)
             if sequence:
                 sequence["label"] = "no_fall"
                 sequences.append(sequence)
                 
         # Save sequences
+        if Path(output_json).exists():
+            with open(output_json, 'r') as f:
+                existing_data = json.load(f)
+                existing_sequences = existing_data.get("sequences", [])
+        else:
+            existing_sequences = []
+
+        # Combine old and new sequences
+        all_sequences = existing_sequences + sequences
+
+        # Write combined sequences to file
         with open(output_json, 'w') as f:
-            json.dump({"sequences": sequences}, f, indent=2)
+            json.dump({"sequences": all_sequences}, f, indent=2)
             
         print(f"Created {len(sequences)} no-fall sequences")
     
@@ -90,10 +106,15 @@ def process_data():
     # Create output directories
     Path("data/sequences").mkdir(parents=True, exist_ok=True)
     
-    builder = SequenceBuilder()
+    # Create builder with no variations or sliding
+    builder = SequenceBuilder(
+        sequence_length=30,
+        frame_variations=0,  # No frame variations for falls
+        no_fall_slide=30      # No sliding window for no-falls
+    )
     
     # Process no-fall data
-    no_fall_input = "data/json/no_fall_training.json"
+    no_fall_input = "/Users/saahi/Desktop/TI_MMWAVE_PROJ/ti-edge-ml-pipeline/data/json/no_fall_training1.json"
     no_fall_output = "data/sequences/no_fall_sequences.json"
     if Path(no_fall_input).exists():
         print("Processing no-fall data...")
@@ -102,7 +123,7 @@ def process_data():
         print(f"No-fall data not found at {no_fall_input}")
     
     # Process fall data
-    fall_input = "data/json/fall_training.json"
+    fall_input = "/Users/saahi/Desktop/TI_MMWAVE_PROJ/ti-edge-ml-pipeline/data/json/fall_training.json"
     timestamps = "data/timestamps/fall_timestamps.json"
     fall_output = "data/sequences/fall_sequences.json"
     if Path(fall_input).exists() and Path(timestamps).exists():

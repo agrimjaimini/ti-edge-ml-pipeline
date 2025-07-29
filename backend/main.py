@@ -1,13 +1,17 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List
-from model.inference import predict_occupancy
 import json
+import os
 from fall_detection.inference.fall_detector import FallDetector
 
 app = FastAPI()
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,7 +21,7 @@ app.add_middleware(
 )
 
 fall_detector = FallDetector(
-    model_path="pointnet_lstm_fall_final.pth",
+    model_path="backend/pointnet_lstm_fall_final.pth",
     sequence_length=20,
     num_points=128
 )
@@ -38,22 +42,59 @@ class RadarPayload(BaseModel):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    clients.append(websocket)
+    if websocket not in clients:  # Check if already in list
+        clients.append(websocket)
     try:
         while True:
-            await websocket.receive_text()
+            # Receive JSON data
+            data = await websocket.receive_json()
+            
+            # Process frame through fall detector
+            fall_result = fall_detector.process_frame({
+                "x_pos": data["x_pos"],
+                "y_pos": data["y_pos"],
+                "z_pos": data["z_pos"]
+            })
+
+            # Create response message
+            message = {
+                "point_data": {
+                    "x_pos": data["x_pos"],
+                    "y_pos": data["y_pos"],
+                    "z_pos": data["z_pos"],
+                    "snr": data.get("snr", []),
+                    "noise": data.get("noise", [])
+                }
+            }
+            
+            # Add fall detection result if available
+            if fall_result:
+                message["fall_detection"] = fall_result
+            
+            # Send back to client
+            await websocket.send_json(message)
+            
     except WebSocketDisconnect:
-        clients.remove(websocket)
+        if websocket in clients:  # Check before removing
+            clients.remove(websocket)
+    except Exception as e:
+        print(f"Error processing frame: {e}")
+        if websocket in clients:  # Check before removing
+            clients.remove(websocket)
 
 async def broadcast_to_clients(message: str):
-    dead = []
-    for ws in clients:
+    disconnected = []
+    for ws in clients[:]:  # Create a copy of the list to iterate
         try:
             await ws.send_text(message)
-        except:
-            dead.append(ws)
-    for ws in dead:
-        clients.remove(ws)
+        except Exception as e:
+            print(f"Error broadcasting to client: {e}")
+            disconnected.append(ws)
+    
+    # Clean up disconnected clients
+    for ws in disconnected:
+        if ws in clients:  # Check before removing
+            clients.remove(ws)
 
 @app.post("/occupancy")
 async def occupancy_hook(payload: RadarPayload):
@@ -105,9 +146,9 @@ async def fall_hook(payload: RadarPayload):
     })
 
 @app.get("/")
-async def home():
-    return "hello"
+async def get_index():
+    return FileResponse('static/index.html')
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

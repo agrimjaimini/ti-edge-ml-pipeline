@@ -26,8 +26,8 @@ var/
 *.egg
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -114,6 +114,16 @@ data/json/*.json
 data/logs/*.log
 runs/
 *.pth
+backend/*.pth  # Model checkpoints in backend directory
+backend/fall_detection/data_collection/data/**/*  # All files in data collection
+backend/static/  # Static files directory
+backend/lambda_fall_detection.py  # Lambda function file
+
+# Python cache files
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Ignore model checkpoints and tensorboard logs
 runs/

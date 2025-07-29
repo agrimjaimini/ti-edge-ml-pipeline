@@ -4,7 +4,7 @@ from collections import deque
 from ..model.pointnet_lstm import PointNetLSTM
 
 class FallDetector:
-    def __init__(self, model_path, sequence_length=20, num_points=128, device=None):
+    def __init__(self, model_path, sequence_length=30, num_points=128, device=None):
         self.sequence_length = sequence_length
         self.num_points = num_points
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -16,7 +16,8 @@ class FallDetector:
         self.model.to(self.device)
         self.model.eval()
         
-        # Initialize frame buffer
+        # Initialize frame buffer as a deque with maxlen
+        # Using appendleft for newest frames, automatically removes oldest when full
         self.frame_buffer = deque(maxlen=sequence_length)
         
     def normalize_points(self, points):
@@ -30,7 +31,8 @@ class FallDetector:
             return np.vstack([points, pad])
             
     def process_frame(self, frame_data):
-        """Process a single frame and return fall detection if sequence is complete"""
+        """Process a single frame and return fall detection result
+        Returns None until buffer has enough frames for first inference"""
         # Extract and normalize point cloud
         points = np.stack([
             frame_data['x_pos'],
@@ -39,10 +41,12 @@ class FallDetector:
         ], axis=1)
         
         normalized_points = self.normalize_points(points)
-        self.frame_buffer.append(normalized_points)
+        # Add newest frame to the beginning
+        self.frame_buffer.appendleft(normalized_points)
         
-        # If buffer is full, perform inference
-        if len(self.frame_buffer) == self.sequence_length:
+        # Perform inference if we have enough frames
+        # This will run on every new frame once buffer is initially filled
+        if len(self.frame_buffer) >= self.sequence_length:
             return self.detect_fall()
         
         return None
@@ -50,7 +54,8 @@ class FallDetector:
     def detect_fall(self):
         """Perform fall detection on current sequence"""
         with torch.no_grad():
-            # Prepare sequence
+            # Convert deque to numpy array
+            # Note: frames are already in newest-to-oldest order due to appendleft
             sequence = np.stack(list(self.frame_buffer))
             sequence = torch.from_numpy(sequence).float()
             sequence = sequence.unsqueeze(0)  # Add batch dimension
@@ -62,7 +67,7 @@ class FallDetector:
             fall_prob = probabilities[0, 1].item()
             
             return {
-                "is_fall": fall_prob > 0.5,
+                "is_fall": fall_prob > 0.7,  # Using increased threshold to reduce false positives
                 "fall_probability": fall_prob,
                 "sequence_complete": True
             }
