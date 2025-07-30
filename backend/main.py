@@ -90,7 +90,7 @@ async def inference_hook(payload: RadarPayload):
             }
         )
     
-    result = predict(sensor_data, payload.model_name, model_info['num_classes'])
+    result = predict(sensor_data, payload.model_name, model_info['num_classes'], payload.snr, payload.noise)
 
     combined_message = json.dumps({
         "event": "inference",

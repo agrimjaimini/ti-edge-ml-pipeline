@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import get_model_path
 
 class TNet(nn.Module):
-    def __init__(self, k=3):
+    def __init__(self, k=5):  # Changed from k=3 to k=5 for 5D input
         super().__init__()
         self.k = k
         self.conv1 = nn.Conv1d(k, 64, 1)
@@ -41,8 +41,8 @@ class TNet(nn.Module):
 class PointNetClassifier(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
-        self.input_tnet = TNet(k=3)
-        self.conv1 = nn.Conv1d(3, 64, 1)
+        self.input_tnet = TNet(k=5)  # Changed from k=3 to k=5 for 5D input
+        self.conv1 = nn.Conv1d(5, 64, 1)  # Changed from 3 to 5 input channels
         self.bn1   = nn.BatchNorm1d(64)
 
         self.feature_tnet = TNet(k=64)
@@ -60,8 +60,8 @@ class PointNetClassifier(nn.Module):
         self.fc3 = nn.Linear(256, num_classes)
 
     def forward(self, x):
-        # x: (B, N, 3)
-        x = x.transpose(2,1)  # (B, 3, N)
+        # x: (B, N, 5) - now includes x,y,z,snr,noise
+        x = x.transpose(2,1)  # (B, 5, N)
         trans = self.input_tnet(x)
         x = torch.bmm(trans, x)
         x = torch.relu(self.bn1(self.conv1(x)))
@@ -91,9 +91,9 @@ def train(model, loader, optimizer, criterion, device, reg_weight=0.001):
         if hasattr(model, 'input_tnet') and hasattr(model, 'feature_tnet'):
             x = points.transpose(2,1)
             trans = model.input_tnet(x)
-            I3 = torch.eye(3).to(trans.device).unsqueeze(0)
-            diff3 = torch.bmm(trans, trans.transpose(1,2)) - I3
-            reg_loss += torch.mean(torch.norm(diff3, dim=(1,2))**2)
+            I5 = torch.eye(5).to(trans.device).unsqueeze(0)  # Changed from I3 to I5
+            diff5 = torch.bmm(trans, trans.transpose(1,2)) - I5
+            reg_loss += torch.mean(torch.norm(diff5, dim=(1,2))**2)
             x = torch.bmm(trans, x)
             # Use the model's conv1 and bn1 layers for feature transformation
             x = torch.relu(model.bn1(model.conv1(x)))
@@ -168,29 +168,3 @@ def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_
         progress_callback(completion_data)
     
 
-# if __name__ == '__main__':
-#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-#     train_loader, val_loader = get_dataloaders('data/json', batch_size=32, num_points=128)
-
-#     model = PointNetClassifier(num_classes=5).to(device)
-#     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
-#     criterion = nn.CrossEntropyLoss()
-#     writer = SummaryWriter(log_dir='runs/pointnet_radar')
-#     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
-
-#     epochs = 35
-#     best_val_loss = float('inf')
-#     for epoch in range(1, epochs + 1):
-#         train_loss = train(model, train_loader, optimizer, criterion, device)
-#         val_loss, val_acc = evaluate(model, val_loader, criterion, device)
-#         scheduler.step()
-
-#         print(f'Epoch {epoch:02d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}')
-#         writer.add_scalar('Loss/Train', train_loss, epoch)
-#         writer.add_scalar('Loss/Val',   val_loss,   epoch)
-#         writer.add_scalar('Acc/Val',    val_acc,    epoch)
-
-#         # Save best model
-#         if val_loss < best_val_loss:
-#             best_val_loss = val_loss
-#     torch.save(model.state_dict(), 'pointnet_occupancy.pth')
