@@ -6,6 +6,11 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from .data_collection.preprocessing import get_dataloaders
 import random
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import get_model_path
+import os
 
 class TNet(nn.Module):
     def __init__(self, k=3):
@@ -137,7 +142,10 @@ def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_
 
         print(f'Epoch {epoch:02d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}')
 
-    torch.save(model.state_dict(), f'models/{name}.pth')
+    # Use absolute path for model saving
+    model_path = get_model_path(name)
+    torch.save(model.state_dict(), model_path)
+    return {"name": name, "num_classes": num_classes, "epochs": epochs, "batch_size": batch_size, "learning_rate": learning_rate, "weight_decay": weight_decay}
     
 
 # if __name__ == '__main__':

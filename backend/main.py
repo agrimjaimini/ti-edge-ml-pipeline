@@ -3,9 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List
-from model.inference import predict_occupancy
+from model.model import create_model
+from model.inference import predict
 import json
-
+import asyncio
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from database import model_db
+from utils import get_models_dir
 app = FastAPI()
 
 app.add_middleware(
@@ -18,6 +24,7 @@ app.add_middleware(
 clients: List[WebSocket] = []
 
 class RadarPayload(BaseModel):
+    model_name: str
     x_pos:    List[float]
     y_pos:    List[float]
     z_pos:    List[float]
@@ -28,6 +35,15 @@ class RadarPayload(BaseModel):
         """Convert radar data to sensor data format."""
         return [[self.x_pos[i], self.y_pos[i], self.z_pos[i]]
                 for i in range(len(self.x_pos))]
+
+class CreateModelPayload(BaseModel):
+    name: str
+    num_classes: int
+    data_dir: str
+    epochs: int
+    batch_size: int
+    learning_rate: float
+    weight_decay: float
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -51,12 +67,23 @@ async def broadcast_to_clients(message: str):
     for ws in dead:
         clients.remove(ws)
 
-@app.post("/occupancy")
-async def occupancy_hook(payload: RadarPayload):
+@app.post("/inference")
+async def inference_hook(payload: RadarPayload):
     """Process radar data and broadcast results to WebSocket clients."""
     sensor_data = payload.to_sensor_data()
 
-    result = predict_occupancy(sensor_data)
+    # Get model info from database to get num_classes
+    model_info = model_db.get_model(payload.model_name)
+    if not model_info:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "status": "error",
+                "message": f"Model '{payload.model_name}' not found in database"
+            }
+        )
+    
+    result = predict(sensor_data, payload.model_name, model_info['num_classes'])
 
     combined_message = json.dumps({
         "occupancy": result,
@@ -75,6 +102,105 @@ async def occupancy_hook(payload: RadarPayload):
         "clients": len(clients)
     })
 
+@app.post("/create_model")
+async def create_model_endpoint(payload: CreateModelPayload):
+    """Create a new model."""
+    try:
+        # Use absolute path for models directory
+        models_dir = get_models_dir()
+        os.makedirs(models_dir, exist_ok=True)
+
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+                None, 
+                create_model,
+                payload.name,
+                payload.num_classes,
+                payload.data_dir,
+                payload.epochs,
+                payload.batch_size,
+                payload.learning_rate,
+                payload.weight_decay
+            )
+
+        model_path = os.path.join(models_dir, f"{payload.name}.pth")
+        if not os.path.exists(model_path):
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": "Model training completed but file not found"
+                }
+            )
+        success = model_db.add_model(
+                name=payload.name,
+                file_path=model_path,
+                num_classes=payload.num_classes,
+                data_dir=payload.data_dir,
+                epochs=payload.epochs,
+                batch_size=payload.batch_size,
+                learning_rate=payload.learning_rate,
+                weight_decay=payload.weight_decay
+        )
+            
+        if success:
+            return JSONResponse(content={
+                "status": "success",
+                "message": f"Model '{payload.name}' created and registered successfully",
+                "model_info": {
+                    "name": payload.name,
+                    "file_path": model_path,
+                    "num_classes": payload.num_classes,
+                    "epochs": payload.epochs,
+                    "batch_size": payload.batch_size
+                }
+            })
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": "Model created but failed to register in database"
+                }
+            )
+                
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Failed to create model: {str(e)}"
+            }
+        )
+
+@app.get("/models/{model_name}")
+async def get_model(model_name: str):
+    """Get specific model information."""
+    try:
+        model = model_db.get_model(model_name)
+        if model:
+            return JSONResponse(content={
+                "status": "success",
+                "model": model
+            })
+        else:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": f"Model '{model_name}' not found"
+                }
+            )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Failed to retrieve model: {str(e)}"
+            }
+        )
+    
 @app.get("/")
 async def home():
     """Return simple home page."""

@@ -1,10 +1,15 @@
 import re
 import json
+import os
 from pathlib import Path
 from datetime import datetime
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils import get_data_subdir
 
 # -------- CONFIG --------
-INPUT_LOG_FILE = "data/logs/0pA.log"
+# Use absolute path for input log file
+INPUT_LOG_FILE = os.path.join(get_data_subdir("logs"), "0pA.log")
 PEOPLE_COUNT = 0
 
 # Start and end times in HH:MM:SS,mmm format (e.g., "18:57:52,747")

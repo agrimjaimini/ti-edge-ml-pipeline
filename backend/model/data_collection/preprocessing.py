@@ -6,6 +6,9 @@ import numpy as np
 from glob import glob
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils import get_data_subdir
 
 def load_all_frames(data_dir):
     """
@@ -18,7 +21,9 @@ def load_all_frames(data_dir):
     """
     clouds = []
     labels = []
-    files = sorted(glob(os.path.join(f'data/{data_dir}', '*.json')))
+    # Use absolute path for data directory
+    data_path = get_data_subdir(data_dir)
+    files = sorted(glob(os.path.join(data_path, '*.json')))
     for path in files:
         with open(path, 'r') as f:
             frames = json.load(f)
@@ -96,5 +101,5 @@ def get_dataloaders(data_dir,
     return train_loader, val_loader
 
 if __name__ == '__main__':
-    tr, va = get_dataloaders('data/json', batch_size=16, num_points=128)
+    tr, va = get_dataloaders('json', batch_size=16, num_points=128)
     print(f"{len(tr.dataset)} train frames, {len(va.dataset)} val frames")
