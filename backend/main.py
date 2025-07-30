@@ -1,17 +1,19 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from model.model import create_model
 from model.inference import predict
 import json
 import asyncio
 import os
 import sys
+import shutil
+from pathlib import Path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import model_db
-from utils import get_models_dir
+from utils import get_models_dir, get_data_dir
 app = FastAPI()
 
 app.add_middleware(
@@ -33,8 +35,13 @@ class RadarPayload(BaseModel):
 
     def to_sensor_data(self) -> List[List[float]]:
         """Convert radar data to sensor data format."""
+        # Ensure all lists have the same length
+        min_length = min(len(self.x_pos), len(self.y_pos), len(self.z_pos))
+        if min_length == 0:
+            return []
+        
         return [[self.x_pos[i], self.y_pos[i], self.z_pos[i]]
-                for i in range(len(self.x_pos))]
+                for i in range(min_length)]
 
 class CreateModelPayload(BaseModel):
     name: str
@@ -86,6 +93,7 @@ async def inference_hook(payload: RadarPayload):
     result = predict(sensor_data, payload.model_name, model_info['num_classes'])
 
     combined_message = json.dumps({
+        "event": "inference",
         "occupancy": result,
         "point_data": {
             "x_pos": payload.x_pos,
@@ -201,6 +209,213 @@ async def get_model(model_name: str):
             }
         )
     
+@app.post("/upload_data")
+async def upload_data(file: UploadFile = File(...)):
+    """Upload a JSON file to the data directory and store metadata in database."""
+    try:
+        # Validate file type - only allow JSON files
+        if not file.filename.lower().endswith('.json'):
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": "Only JSON files (.json) are allowed"
+                }
+            )
+        
+        # Validate content type if provided
+        if file.content_type and file.content_type not in ['application/json', 'text/json']:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": "Invalid content type. Only JSON files are allowed"
+                }
+            )
+        
+        # Validate JSON content
+        try:
+            content = await file.read()
+            # Try to parse as JSON to validate
+            json.loads(content.decode('utf-8'))
+            # Reset file pointer for saving
+            await file.seek(0)
+        except json.JSONDecodeError:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": "Invalid JSON content. Please upload a valid JSON file"
+                }
+            )
+        except UnicodeDecodeError:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": "File must be UTF-8 encoded"
+                }
+            )
+        
+        # Get the data directory path
+        data_dir = get_data_dir()
+        
+        # Create the full file path
+        file_path = os.path.join(data_dir, file.filename)
+        
+        # Check if file already exists
+        if os.path.exists(file_path):
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "status": "error",
+                    "message": f"File '{file.filename}' already exists"
+                }
+            )
+        
+        # Save the uploaded file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Get file size
+        file_size = os.path.getsize(file_path)
+        
+        # Store file metadata in database
+        success = model_db.add_file(
+            filename=file.filename,
+            file_path=file_path,
+            file_size_bytes=file_size,
+            content_type="application/json"
+        )
+        
+        if not success:
+            # If database storage fails, remove the uploaded file
+            os.remove(file_path)
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": "File uploaded but failed to store metadata in database"
+                }
+            )
+        
+        return JSONResponse(content={
+            "status": "success",
+            "message": f"JSON file '{file.filename}' uploaded successfully",
+            "file_info": {
+                "filename": file.filename,
+                "size_bytes": file_size,
+                "path": file_path,
+                "content_type": "application/json"
+            }
+        })
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Failed to upload file: {str(e)}"
+            }
+        )
+
+@app.get("/data_files")
+async def list_data_files():
+    """List all files from the database."""
+    try:
+        files = model_db.get_all_files()
+        
+        return JSONResponse(content={
+            "status": "success",
+            "files": files,
+            "total_files": len(files)
+        })
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Failed to list files: {str(e)}"
+            }
+        )
+
+@app.get("/data_files/{filename}")
+async def get_file_info(filename: str):
+    """Get information about a specific file from the database."""
+    try:
+        file_info = model_db.get_file(filename)
+        
+        if file_info:
+            return JSONResponse(content={
+                "status": "success",
+                "file": file_info
+            })
+        else:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": f"File '{filename}' not found in database"
+                }
+            )
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Failed to retrieve file info: {str(e)}"
+            }
+        )
+
+@app.delete("/data_files/{filename}")
+async def delete_file(filename: str):
+    """Delete a file from both the filesystem and database."""
+    try:
+        # Get file info from database
+        file_info = model_db.get_file(filename)
+        
+        if not file_info:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": f"File '{filename}' not found in database"
+                }
+            )
+        
+        # Delete from filesystem
+        file_path = file_info['file_path']
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        # Delete from database
+        success = model_db.delete_file(filename)
+        
+        if success:
+            return JSONResponse(content={
+                "status": "success",
+                "message": f"File '{filename}' deleted successfully"
+            })
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": "File deleted from filesystem but failed to remove from database"
+                }
+            )
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Failed to delete file: {str(e)}"
+            }
+        )
+
 @app.get("/")
 async def home():
     """Return simple home page."""

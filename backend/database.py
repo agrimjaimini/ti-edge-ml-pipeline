@@ -10,7 +10,7 @@ class ModelDatabase:
         self.init_database()
     
     def init_database(self):
-        """Initialize the database with the models table."""
+        """Initialize the database with the models and files tables."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
@@ -26,6 +26,18 @@ class ModelDatabase:
                     weight_decay REAL NOT NULL,
                     file_size_mb REAL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    metadata TEXT
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS files (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    filename TEXT NOT NULL,
+                    file_path TEXT UNIQUE NOT NULL,
+                    file_size_bytes INTEGER NOT NULL,
+                    content_type TEXT,
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     metadata TEXT
                 )
             ''')
@@ -92,5 +104,73 @@ class ModelDatabase:
                 models.append(model_dict)
             
             return models
+
+    def add_file(self, 
+                 filename: str,
+                 file_path: str,
+                 file_size_bytes: int,
+                 content_type: str = None,
+                 metadata: Dict = None) -> bool:
+        """Add a file record to the database."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO files 
+                    (filename, file_path, file_size_bytes, content_type, metadata)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    filename, file_path, file_size_bytes, content_type,
+                    json.dumps(metadata) if metadata else None
+                ))
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error adding file to database: {e}")
+            return False
+
+    def get_file(self, filename: str) -> Optional[Dict]:
+        """Get a specific file record from the database."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM files WHERE filename = ?', (filename,))
+            row = cursor.fetchone()
+            
+            if row:
+                columns = [description[0] for description in cursor.description]
+                file_dict = dict(zip(columns, row))
+                if file_dict.get('metadata'):
+                    file_dict['metadata'] = json.loads(file_dict['metadata'])
+                return file_dict
+            return None
+
+    def get_all_files(self) -> List[Dict]:
+        """Get all files from the database."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM files ORDER BY uploaded_at DESC')
+            rows = cursor.fetchall()
+            
+            columns = [description[0] for description in cursor.description]
+            files = []
+            for row in rows:
+                file_dict = dict(zip(columns, row))
+                if file_dict.get('metadata'):
+                    file_dict['metadata'] = json.loads(file_dict['metadata'])
+                files.append(file_dict)
+            
+            return files
+
+    def delete_file(self, filename: str) -> bool:
+        """Delete a file record from the database."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM files WHERE filename = ?', (filename,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error deleting file from database: {e}")
+            return False
 
 model_db = ModelDatabase()
