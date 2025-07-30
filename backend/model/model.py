@@ -138,12 +138,9 @@ def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_
 
         print(f'Epoch {epoch:02d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}')
 
-    # Use absolute path for model saving
     model_path = get_model_path(name)
-    # Ensure the models directory exists
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     torch.save(model.state_dict(), model_path)
-    return {"name": name, "num_classes": num_classes, "epochs": epochs, "batch_size": batch_size, "learning_rate": learning_rate, "weight_decay": weight_decay}
     
 
 # if __name__ == '__main__':
