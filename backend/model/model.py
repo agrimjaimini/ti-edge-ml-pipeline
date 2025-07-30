@@ -122,7 +122,7 @@ def evaluate(model, loader, criterion, device):
             total += labels.size(0)
     return loss_sum / len(loader.dataset), correct / total
 
-def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_size: int, learning_rate: float, weight_decay: float):
+def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_size: int, learning_rate: float, weight_decay: float, progress_callback=None):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_loader, val_loader = get_dataloaders(data_dir, batch_size, num_points=128)
@@ -137,10 +137,35 @@ def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_
         scheduler.step()
 
         print(f'Epoch {epoch:02d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}')
+        
+        if progress_callback:
+            progress_data = {
+                "event": "training_progress",
+                "model_name": name,
+                "epoch": epoch,
+                "total_epochs": epochs,
+                "train_loss": float(train_loss),
+                "val_loss": float(val_loss),
+                "val_accuracy": float(val_acc),
+                "progress_percent": (epoch / epochs) * 100
+            }
+            progress_callback(progress_data)
 
     model_path = get_model_path(name)
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     torch.save(model.state_dict(), model_path)
+    
+    # Send completion notification
+    if progress_callback:
+        completion_data = {
+            "event": "training_complete",
+            "model_name": name,
+            "final_train_loss": float(train_loss),
+            "final_val_loss": float(val_loss),
+            "final_val_accuracy": float(val_acc),
+            "model_path": model_path
+        }
+        progress_callback(completion_data)
     
 
 # if __name__ == '__main__':

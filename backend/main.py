@@ -120,6 +120,10 @@ async def create_model_endpoint(payload: CreateModelPayload):
 
         loop = asyncio.get_event_loop()
         try:
+            def progress_callback(data):
+                # Run the broadcast in the event loop
+                asyncio.create_task(broadcast_to_clients(json.dumps(data)))
+            
             await loop.run_in_executor(
                     None, 
                     create_model,
@@ -129,7 +133,8 @@ async def create_model_endpoint(payload: CreateModelPayload):
                     payload.epochs,
                     payload.batch_size,
                     payload.learning_rate,
-                    payload.weight_decay
+                    payload.weight_decay,
+                    progress_callback
                 )
         except Exception as e:
             return JSONResponse(
@@ -187,6 +192,103 @@ async def create_model_endpoint(payload: CreateModelPayload):
             content={
                 "status": "error",
                 "message": f"Failed to create model: {str(e)}"
+            }
+        )
+
+@app.post("/start_training")
+async def start_training_endpoint(payload: CreateModelPayload):
+    """Start model training with real-time progress updates."""
+    try:
+        # Send training start notification
+        start_message = json.dumps({
+            "event": "training_started",
+            "model_name": payload.name,
+            "total_epochs": payload.epochs,
+            "batch_size": payload.batch_size,
+            "learning_rate": payload.learning_rate
+        })
+        await broadcast_to_clients(start_message)
+
+        # Use absolute path for models directory
+        models_dir = get_models_dir()
+        os.makedirs(models_dir, exist_ok=True)
+
+        loop = asyncio.get_event_loop()
+        try:
+            # Create a progress callback function that broadcasts to WebSocket clients
+            def progress_callback(data):
+                # Run the broadcast in the event loop
+                asyncio.create_task(broadcast_to_clients(json.dumps(data)))
+            
+            await loop.run_in_executor(
+                    None, 
+                    create_model,
+                    payload.name,
+                    payload.num_classes,
+                    payload.data_dir,
+                    payload.epochs,
+                    payload.batch_size,
+                    payload.learning_rate,
+                    payload.weight_decay,
+                    progress_callback
+                )
+
+            model_path = os.path.join(models_dir, f"{payload.name}.pth")
+            if not os.path.exists(model_path):
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "status": "error",
+                        "message": "Model training completed but file not found"
+                    }
+                )
+            success = model_db.add_model(
+                    name=payload.name,
+                    file_path=model_path,
+                    num_classes=payload.num_classes,
+                    data_dir=payload.data_dir,
+                    epochs=payload.epochs,
+                    batch_size=payload.batch_size,
+                    learning_rate=payload.learning_rate,
+                    weight_decay=payload.weight_decay
+            )
+                
+            if success:
+                return JSONResponse(content={
+                    "status": "success",
+                    "message": f"Model '{payload.name}' trained and registered successfully",
+                    "model_info": {
+                        "name": payload.name,
+                        "file_path": model_path,
+                        "num_classes": payload.num_classes,
+                        "epochs": payload.epochs,
+                        "batch_size": payload.batch_size
+                    }
+                })
+            else:
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "status": "error",
+                        "message": "Model trained but failed to register in database"
+                    }
+                )
+                    
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": f"Model training failed: {str(e)}"
+                }
+            )
+                
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Failed to start training: {str(e)}"
             }
         )
 
