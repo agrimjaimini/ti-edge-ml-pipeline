@@ -54,7 +54,10 @@ class ModelDatabase:
                   weight_decay: float,
                   metadata: Dict = None) -> bool:
         try:
-            file_size_mb = os.path.getsize(file_path) / (1024 * 1024) if os.path.exists(file_path) else 0
+            try:
+                file_size_mb = os.path.getsize(file_path) / (1024 * 1024) if os.path.exists(file_path) else 0
+            except OSError:
+                file_size_mb = 0
                 
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()

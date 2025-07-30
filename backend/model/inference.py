@@ -8,7 +8,6 @@ from database import model_db
 # (A) Where the weights live
 HERE       = os.path.dirname(__file__)
 REPO_ROOT  = os.path.abspath(os.path.join(HERE, "..", ".."))
-MODEL_DIR = DEFAULT_MODELS_DIR = os.path.join(REPO_ROOT, "models")
 DEVICE     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 _model: PointNetClassifier = None
@@ -30,11 +29,14 @@ def _load_model(model_name: str, num_classes: int) -> PointNetClassifier:
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
             
-        state = torch.load(model_path, map_location=DEVICE)
-        m.load_state_dict(state)
-        m.to(DEVICE).eval()
-        _model = m
-        _current_model_path = model_path
+        try:
+            state = torch.load(model_path, map_location=DEVICE)
+            m.load_state_dict(state)
+            m.to(DEVICE).eval()
+            _model = m
+            _current_model_path = model_path
+        except Exception as e:
+            raise RuntimeError(f"Failed to load model from {model_path}: {e}")
     
     return _model
 

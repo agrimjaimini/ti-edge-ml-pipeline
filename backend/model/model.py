@@ -3,13 +3,11 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from .data_collection.preprocessing import get_dataloaders
-import random
+from .preprocessing import get_dataloaders
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import get_model_path
-import os
 
 class TNet(nn.Module):
     def __init__(self, k=3):
@@ -36,7 +34,7 @@ class TNet(nn.Module):
         x = torch.max(x, 2)[0]
         x = torch.relu(self.bn4(self.fc1(x)))
         x = torch.relu(self.bn5(self.fc2(x)))
-        init = torch.eye(self.k, requires_grad=True).repeat(batchsize,1,1).to(x.device)
+        init = torch.eye(self.k, requires_grad=False).repeat(batchsize,1,1).to(x.device)
         mat = self.fc3(x).view(-1, self.k, self.k) + init
         return mat
 
@@ -89,16 +87,15 @@ def train(model, loader, optimizer, criterion, device, reg_weight=0.001):
         optimizer.zero_grad()
         outputs = model(points)
         loss = criterion(outputs, labels)
-        # Transform regularization
         reg_loss = 0.0
         if hasattr(model, 'input_tnet') and hasattr(model, 'feature_tnet'):
-            # Forward through TNet to get matrices
             x = points.transpose(2,1)
             trans = model.input_tnet(x)
             I3 = torch.eye(3).to(trans.device).unsqueeze(0)
             diff3 = torch.bmm(trans, trans.transpose(1,2)) - I3
             reg_loss += torch.mean(torch.norm(diff3, dim=(1,2))**2)
             x = torch.bmm(trans, x)
+            # Use the model's conv1 and bn1 layers for feature transformation
             x = torch.relu(model.bn1(model.conv1(x)))
             trans_feat = model.feature_tnet(x)
             I64 = torch.eye(64).to(trans_feat.device).unsqueeze(0)
@@ -143,6 +140,8 @@ def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_
 
     # Use absolute path for model saving
     model_path = get_model_path(name)
+    # Ensure the models directory exists
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
     torch.save(model.state_dict(), model_path)
     return {"name": name, "num_classes": num_classes, "epochs": epochs, "batch_size": batch_size, "learning_rate": learning_rate, "weight_decay": weight_decay}
     

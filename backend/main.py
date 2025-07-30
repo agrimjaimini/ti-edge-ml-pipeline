@@ -2,7 +2,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 from model.model import create_model
 from model.inference import predict
 import json
@@ -114,22 +114,30 @@ async def inference_hook(payload: RadarPayload):
 async def create_model_endpoint(payload: CreateModelPayload):
     """Create a new model."""
     try:
-        # Use absolute path for models directory
         models_dir = get_models_dir()
         os.makedirs(models_dir, exist_ok=True)
 
 
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-                None, 
-                create_model,
-                payload.name,
-                payload.num_classes,
-                payload.data_dir,
-                payload.epochs,
-                payload.batch_size,
-                payload.learning_rate,
-                payload.weight_decay
+        try:
+            await loop.run_in_executor(
+                    None, 
+                    create_model,
+                    payload.name,
+                    payload.num_classes,
+                    payload.data_dir,
+                    payload.epochs,
+                    payload.batch_size,
+                    payload.learning_rate,
+                    payload.weight_decay
+                )
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": f"Model training failed: {str(e)}"
+                }
             )
 
         model_path = os.path.join(models_dir, f"{payload.name}.pth")
