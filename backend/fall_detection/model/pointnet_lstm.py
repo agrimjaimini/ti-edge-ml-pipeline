@@ -230,8 +230,8 @@ if __name__ == '__main__':
     total = n_falls + n_no_falls
     
     # Increase fall weight significantly to combat bias
-    fall_weight = 1.3 * total / (2 * n_falls)      # Reduced from 2.0 to 1.0 to decrease sensitivity
-    no_fall_weight = total / (2 * n_no_falls)
+    fall_weight = 1 * total / (2 * n_falls)      # Reduced from 2.0 to 1.0 to decrease sensitivity
+    no_fall_weight = 1.2 * total / (2 * n_no_falls)
     print(f"\nClass weights - Fall: {fall_weight:.3f}, No-Fall: {no_fall_weight:.3f}")
     
     class_weights = torch.tensor([no_fall_weight, fall_weight]).to(device)
@@ -262,7 +262,6 @@ if __name__ == '__main__':
 
     # Training loop
     epochs = 5
-    best_val_acc = 0.0
     
     print("\nStarting training...")
     print("Press Ctrl+C to stop training early\n")
@@ -291,21 +290,12 @@ if __name__ == '__main__':
             writer.add_scalar('Accuracy/Val', val_metrics["accuracy"], epoch)
             writer.add_scalar('Accuracy/Val_Fall', val_metrics["fall_accuracy"], epoch)
             writer.add_scalar('Accuracy/Val_NoFall', val_metrics["no_fall_accuracy"], epoch)
-
-            # Save best model based on overall accuracy
-            if val_metrics["accuracy"] > best_val_acc:
-                best_val_acc = val_metrics["accuracy"]
-                print(f"\nNew best validation accuracy: {val_metrics['accuracy']:.2%}")
-                torch.save(model.state_dict(), 'pointnet_lstm_fall_best.pth')
-                print("Saved model checkpoint")
             
             print("\nPress Ctrl+C to stop training")
             
     except KeyboardInterrupt:
         print("\nTraining interrupted by user")
-    
-    print(f"\nBest validation accuracy: {best_val_acc:.2%}")
 
     # Save final model
-    torch.save(model.state_dict(), 'pointnet_lstm_fall_final.pth')
+    torch.save(model.state_dict(), 'pointnet_lstm_fall.pth')
     print("Saved final model") 

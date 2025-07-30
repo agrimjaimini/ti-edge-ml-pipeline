@@ -1,0 +1,16 @@
+fastapi==0.109.2
+uvicorn==0.27.1
+websockets==12.0
+numpy==1.26.3
+torch==2.2.0
+pydantic==2.6.1
+python-multipart==0.0.6
+tensorboard==2.15.1
+scikit-learn==1.4.0
+scipy==1.12.0
+pandas==2.2.0  # Often used with sklearn
+tqdm==4.66.1   # For progress bars in training
+glob2==0.7     # For glob patterns in preprocessing
+starlette==0.36.3  # Required by FastAPI for WebSocket
+typing-extensions==4.9.0  # Often needed for type hints
+pillow==10.2.0  # Required by tensorboard 

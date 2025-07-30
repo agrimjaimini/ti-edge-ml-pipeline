@@ -4,12 +4,12 @@ from pathlib import Path
 from datetime import datetime
 
 # -------- CONFIG --------
-INPUT_LOG_FILE = "/Users/saahi/Desktop/TI_MMWAVE_PROJ/ti-edge-ml-pipeline/data/logs/not_fall1.log"
+INPUT_LOG_FILE = "/Users/saahi/Desktop/TI_MMWAVE_PROJ/ti-edge-ml-pipeline/data/logs/fall1.log"
 PEOPLE_COUNT = 1
 
 # Start and end times in HH:MM:SS,mmm format (e.g., "18:57:52,747")
-START_TIME_STR = "17:27:32,647"
-END_TIME_STR   = "17:31:04,714"
+START_TIME_STR = "16:36:36,101"
+END_TIME_STR   = "17:01:02,879"
 # ------------------------
 
 def time_str_to_millis(time_str):

@@ -1,17 +1,14 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List
+from model.inference import predict_occupancy
+from fall_detection.inference.fall_detector import FallDetector
 import json
 import os
-from fall_detection.inference.fall_detector import FallDetector
 
 app = FastAPI()
-
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,10 +17,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize fall detector
+model_paths = [
+    os.path.join(os.path.dirname(__file__), 'fall_detection/model/pointnet_lstm_fall.pth'),
+    os.path.join(os.path.dirname(__file__), 'pointnet_lstm_fall.pth'),
+    'pointnet_lstm_fall.pth'
+]
+
+# Try to find model weights
+model_path = None
+for path in model_paths:
+    if os.path.exists(path):
+        model_path = path
+        break
+
+if model_path is None:
+    raise FileNotFoundError("Could not find model weights file")
+
 fall_detector = FallDetector(
-    model_path="backend/pointnet_lstm_fall_final.pth",
-    sequence_length=20,
-    num_points=128
+    sequence_length=30,
+    num_points=128,
+    model_path=model_path  # Changed from weights_path to model_path
 )
 
 clients: List[WebSocket] = []
@@ -36,14 +50,15 @@ class RadarPayload(BaseModel):
     noise:    List[float]
 
     def to_sensor_data(self) -> List[List[float]]:
+        """Convert radar data to sensor data format."""
         return [[self.x_pos[i], self.y_pos[i], self.z_pos[i]]
                 for i in range(len(self.x_pos))]
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    """Handle WebSocket connections and process real-time data."""
     await websocket.accept()
-    if websocket not in clients:  # Check if already in list
-        clients.append(websocket)
+    clients.append(websocket)
     try:
         while True:
             # Receive JSON data
@@ -53,7 +68,9 @@ async def websocket_endpoint(websocket: WebSocket):
             fall_result = fall_detector.process_frame({
                 "x_pos": data["x_pos"],
                 "y_pos": data["y_pos"],
-                "z_pos": data["z_pos"]
+                "z_pos": data["z_pos"],
+                "snr": data.get("snr", []),
+                "noise": data.get("noise", [])
             })
 
             # Create response message
@@ -75,29 +92,25 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json(message)
             
     except WebSocketDisconnect:
-        if websocket in clients:  # Check before removing
-            clients.remove(websocket)
+        clients.remove(websocket)
     except Exception as e:
         print(f"Error processing frame: {e}")
-        if websocket in clients:  # Check before removing
-            clients.remove(websocket)
+        clients.remove(websocket)
 
 async def broadcast_to_clients(message: str):
-    disconnected = []
-    for ws in clients[:]:  # Create a copy of the list to iterate
+    """Send message to all connected clients and clean up dead connections."""
+    dead = []
+    for ws in clients:
         try:
             await ws.send_text(message)
-        except Exception as e:
-            print(f"Error broadcasting to client: {e}")
-            disconnected.append(ws)
-    
-    # Clean up disconnected clients
-    for ws in disconnected:
-        if ws in clients:  # Check before removing
-            clients.remove(ws)
+        except:
+            dead.append(ws)
+    for ws in dead:
+        clients.remove(ws)
 
 @app.post("/occupancy")
 async def occupancy_hook(payload: RadarPayload):
+    """Process radar data and broadcast results to WebSocket clients."""
     sensor_data = payload.to_sensor_data()
 
     result = predict_occupancy(sensor_data)
@@ -121,10 +134,13 @@ async def occupancy_hook(payload: RadarPayload):
 
 @app.post("/fall")
 async def fall_hook(payload: RadarPayload):
+    """Process fall detection for HTTP requests."""
     fall_result = fall_detector.process_frame({
         "x_pos": payload.x_pos,
         "y_pos": payload.y_pos,
-        "z_pos": payload.z_pos
+        "z_pos": payload.z_pos,
+        "snr": payload.snr,
+        "noise": payload.noise
     })
 
     if fall_result:
@@ -146,8 +162,9 @@ async def fall_hook(payload: RadarPayload):
     })
 
 @app.get("/")
-async def get_index():
-    return FileResponse('static/index.html')
+async def home():
+    """Return simple home page."""
+    return "hello"
 
 if __name__ == "__main__":
     import uvicorn

@@ -95,11 +95,23 @@ class SequenceBuilder:
                         sequence["fall_frame_offset"] = offset
                         sequences.append(sequence)
         
-        # Save sequences
+        # Load existing sequences if file exists
+        if Path(output_json).exists():
+            with open(output_json, 'r') as f:
+                existing_data = json.load(f)
+                existing_sequences = existing_data.get("sequences", [])
+        else:
+            existing_sequences = []
+
+        # Combine old and new sequences
+        all_sequences = existing_sequences + sequences
+        
+        # Save combined sequences
         with open(output_json, 'w') as f:
-            json.dump({"sequences": sequences}, f, indent=2)
+            json.dump({"sequences": all_sequences}, f, indent=2)
             
-        print(f"Created {len(sequences)} fall sequences from {len(fall_events)} events")
+        print(f"Created {len(sequences)} new fall sequences from {len(fall_events)} events")
+        print(f"Total fall sequences: {len(all_sequences)}")
 
 def process_data():
     """Process both fall and no-fall data"""
@@ -114,7 +126,7 @@ def process_data():
     )
     
     # Process no-fall data
-    no_fall_input = "/Users/saahi/Desktop/TI_MMWAVE_PROJ/ti-edge-ml-pipeline/data/json/no_fall_training1.json"
+    no_fall_input = "/Users/saahi/Desktop/TI_MMWAVE_PROJ/ti-edge-ml-pipeline/data/json/no_fall_training2.json"
     no_fall_output = "data/sequences/no_fall_sequences.json"
     if Path(no_fall_input).exists():
         print("Processing no-fall data...")
@@ -123,7 +135,7 @@ def process_data():
         print(f"No-fall data not found at {no_fall_input}")
     
     # Process fall data
-    fall_input = "/Users/saahi/Desktop/TI_MMWAVE_PROJ/ti-edge-ml-pipeline/data/json/fall_training.json"
+    fall_input = "/Users/saahi/Desktop/TI_MMWAVE_PROJ/ti-edge-ml-pipeline/data/json/fall_training1.json"
     timestamps = "data/timestamps/fall_timestamps.json"
     fall_output = "data/sequences/fall_sequences.json"
     if Path(fall_input).exists() and Path(timestamps).exists():
