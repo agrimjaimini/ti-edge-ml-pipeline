@@ -1,15 +1,20 @@
 import re
 import json
+import os
 from pathlib import Path
 from datetime import datetime
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils import get_data_subdir
 
 # -------- CONFIG --------
-INPUT_LOG_FILE = "/Users/saahi/Desktop/TI_MMWAVE_PROJ/ti-edge-ml-pipeline/data/logs/fall1.log"
-PEOPLE_COUNT = 1
+# Use absolute path for input log file
+INPUT_LOG_FILE = os.path.join(get_data_subdir("logs"), "0pA.log")
+PEOPLE_COUNT = 0
 
 # Start and end times in HH:MM:SS,mmm format (e.g., "18:57:52,747")
-START_TIME_STR = "16:36:36,101"
-END_TIME_STR   = "17:01:02,879"
+START_TIME_STR = "18:33:01,192"
+END_TIME_STR   = "18:43:11,715"
 # ------------------------
 
 def time_str_to_millis(time_str):
@@ -22,7 +27,7 @@ END_MS = time_str_to_millis(END_TIME_STR)
 now = datetime.now().strftime("%Y%m%d_%H%M%S")
 OUTPUT_JSON_FILE = f"{PEOPLE_COUNT}people_training_{now}.json"
 
-with open(INPUT_LOG_FILE, "r") as f:
+with open(INPUT_LOG_FILE, "r", encoding="utf-8", errors="ignore") as f:
     log_lines = f.readlines()
 
 frames = []

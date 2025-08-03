@@ -13,4 +13,4 @@ ENV PYTHONPATH=/app
 EXPOSE 8080
 
 # run training then start server (sequential)
-CMD ["sh", "-c", "python -m backend.model.model && cd backend && python -m backend.main"]
+CMD ["sh", "-c", "cd backend && python -m main"]

@@ -16,3 +16,51 @@ Features
 - Saahil Mehta - University of Texas at Austin
 - Prathik Narsetty - University of Texas at Austin
 - Anish Hariharan - Texas A&M University
+
+## Project Structure
+
+```
+.
+├── backend/
+│   ├── main.py
+│   └── model/
+│       ├── data_collection/
+│       ├── inference.py
+│       └── model.py
+├── data/
+│   ├── json/
+│   └── logs/
+├── frontend/
+│   └── index.html
+├── runs/
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+├── .gitignore
+├── README.md
+└── venv/
+```
+
+## Setup
+
+1. **Create a virtual environment (recommended: .venv):**
+   ```sh
+   python3 -m venv .venv
+   ```
+2. **Activate the virtual environment:**
+   - On macOS/Linux:
+     ```sh
+     source .venv/bin/activate
+     ```
+   - On Windows:
+     ```sh
+     .venv\Scripts\activate
+     ```
+3. **Install dependencies:**
+   ```sh
+   pip install -r requirements.txt
+   ```
+
+4. **Run the backend or training as needed.**
+
+All generated files, logs, and virtual environments are ignored by git as per the .gitignore file.
