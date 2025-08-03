@@ -54,6 +54,17 @@ class RadarPayload(BaseModel):
         return [[self.x_pos[i], self.y_pos[i], self.z_pos[i]]
                 for i in range(len(self.x_pos))]
 
+async def broadcast_to_clients(message: str):
+    """Send message to all connected clients and clean up dead connections."""
+    dead = []
+    for ws in clients[:]:  # Create a copy of the list to iterate over
+        try:
+            await ws.send_text(message)
+        except Exception as e:
+            print(f"Failed to send to client: {e}")
+            if ws in clients:  # Check if client is still in list
+                clients.remove(ws)
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Handle WebSocket connections and process real-time data."""
@@ -92,21 +103,12 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json(message)
             
     except WebSocketDisconnect:
-        clients.remove(websocket)
+        if websocket in clients:
+            clients.remove(websocket)
     except Exception as e:
         print(f"Error processing frame: {e}")
-        clients.remove(websocket)
-
-async def broadcast_to_clients(message: str):
-    """Send message to all connected clients and clean up dead connections."""
-    dead = []
-    for ws in clients:
-        try:
-            await ws.send_text(message)
-        except:
-            dead.append(ws)
-    for ws in dead:
-        clients.remove(ws)
+        if websocket in clients:
+            clients.remove(websocket)
 
 @app.post("/occupancy")
 async def occupancy_hook(payload: RadarPayload):

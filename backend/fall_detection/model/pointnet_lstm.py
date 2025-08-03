@@ -230,8 +230,8 @@ if __name__ == '__main__':
     total = n_falls + n_no_falls
     
     # Increase fall weight significantly to combat bias
-    fall_weight = 1 * total / (2 * n_falls)      # Reduced from 2.0 to 1.0 to decrease sensitivity
-    no_fall_weight = 1.2 * total / (2 * n_no_falls)
+    fall_weight = 1.2 * total / (2 * n_falls)      # Reduced from 2.0 to 1.0 to decrease sensitivity
+    no_fall_weight = 1.5 * total / (2 * n_no_falls)
     print(f"\nClass weights - Fall: {fall_weight:.3f}, No-Fall: {no_fall_weight:.3f}")
     
     class_weights = torch.tensor([no_fall_weight, fall_weight]).to(device)
@@ -261,7 +261,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir='runs/pointnet_lstm_fall')
 
     # Training loop
-    epochs = 5
+    epochs = 6
     
     print("\nStarting training...")
     print("Press Ctrl+C to stop training early\n")

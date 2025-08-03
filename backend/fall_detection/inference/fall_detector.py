@@ -86,7 +86,7 @@ class FallDetector:
                 smoothed_prob = self.update_ema(fall_prob)
                 
                 return {
-                    "is_fall": smoothed_prob > 0.8,  # Threshold applied to smoothed probability
+                    "is_fall": smoothed_prob > 0.7,  # Threshold applied to smoothed probability
                     "fall_probability": smoothed_prob,  # Return smoothed probability
                     "raw_probability": fall_prob,  # Also return raw probability for debugging
                     "sequence_complete": True
