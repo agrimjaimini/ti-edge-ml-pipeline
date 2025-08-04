@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from typing import List
 from model.model import create_model
 from model.inference import predict
-from fall_detection.inference.fall_detector import FallDetector
 import json
 import asyncio
 import os
@@ -15,7 +14,6 @@ from pathlib import Path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import model_db
 from utils import get_models_dir, get_data_dir
-
 app = FastAPI()
 
 app.add_middleware(
@@ -25,33 +23,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize fall detector
-model_paths = [
-    os.path.join(os.path.dirname(__file__), 'fall_detection/model/pointnet_lstm_fall.pth'),
-    os.path.join(os.path.dirname(__file__), 'pointnet_lstm_fall.pth'),
-    'pointnet_lstm_fall.pth'
-]
-
-# Try to find model weights
-model_path = None
-for path in model_paths:
-    if os.path.exists(path):
-        model_path = path
-        break
-
-if model_path is None:
-    raise FileNotFoundError("Could not find model weights file")
-
-fall_detector = FallDetector(
-    sequence_length=30,
-    num_points=128,
-    model_path=model_path
-)
-
 clients: List[WebSocket] = []
 
 class RadarPayload(BaseModel):
-    model_name: str = None  # Optional for fall detection
+    model_name: str
     x_pos:    List[float]
     y_pos:    List[float]
     z_pos:    List[float]
@@ -77,61 +52,27 @@ class CreateModelPayload(BaseModel):
     learning_rate: float
     weight_decay: float
 
-async def broadcast_to_clients(message: str):
-    """Send message to all connected clients and clean up dead connections."""
-    dead = []
-    for ws in clients[:]:  # Create a copy of the list to iterate over
-        try:
-            await ws.send_text(message)
-        except Exception as e:
-            print(f"Failed to send to client: {e}")
-            if ws in clients:  # Check if client is still in list
-                clients.remove(ws)
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """Handle WebSocket connections and process real-time data."""
+    """Handle WebSocket connections."""
     await websocket.accept()
     clients.append(websocket)
     try:
         while True:
-            # Receive JSON data
-            data = await websocket.receive_json()
-            
-            # Process frame through fall detector
-            fall_result = fall_detector.process_frame({
-                "x_pos": data["x_pos"],
-                "y_pos": data["y_pos"],
-                "z_pos": data["z_pos"],
-                "snr": data.get("snr", []),
-                "noise": data.get("noise", [])
-            })
-
-            # Create response message
-            message = {
-                "point_data": {
-                    "x_pos": data["x_pos"],
-                    "y_pos": data["y_pos"],
-                    "z_pos": data["z_pos"],
-                    "snr": data.get("snr", []),
-                    "noise": data.get("noise", [])
-                }
-            }
-            
-            # Add fall detection result if available
-            if fall_result:
-                message["fall_detection"] = fall_result
-            
-            # Send back to client
-            await websocket.send_json(message)
-            
+            await websocket.receive_text()
     except WebSocketDisconnect:
-        if websocket in clients:
-            clients.remove(websocket)
-    except Exception as e:
-        print(f"Error processing frame: {e}")
-        if websocket in clients:
-            clients.remove(websocket)
+        clients.remove(websocket)
+
+async def broadcast_to_clients(message: str):
+    """Send message to all connected clients and clean up dead connections."""
+    dead = []
+    for ws in clients:
+        try:
+            await ws.send_text(message)
+        except:
+            dead.append(ws)
+    for ws in dead:
+        clients.remove(ws)
 
 @app.post("/inference")
 async def inference_hook(payload: RadarPayload):
@@ -139,63 +80,33 @@ async def inference_hook(payload: RadarPayload):
     sensor_data = payload.to_sensor_data()
 
     # Get model info from database to get num_classes
-    if payload.model_name:  # Only if model_name is provided
-        model_info = model_db.get_model(payload.model_name)
-        if not model_info:
-            return JSONResponse(
-                status_code=404,
-                content={
-                    "status": "error",
-                    "message": f"Model '{payload.model_name}' not found in database"
-                }
-            )
-        
-        result = predict(sensor_data, payload.model_name, model_info['num_classes'], payload.snr, payload.noise)
-
-        combined_message = json.dumps({
-            "event": "inference",
-            "occupancy": result,
-            "point_data": {
-                "x_pos": payload.x_pos,
-                "y_pos": payload.y_pos,
-                "z_pos": payload.z_pos,
-                "snr": payload.snr,
-                "noise": payload.noise
+    model_info = model_db.get_model(payload.model_name)
+    if not model_info:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "status": "error",
+                "message": f"Model '{payload.model_name}' not found in database"
             }
-        })
-        await broadcast_to_clients(combined_message)
+        )
+    
+    result = predict(sensor_data, payload.model_name, model_info['num_classes'], payload.snr, payload.noise)
+
+    combined_message = json.dumps({
+        "event": "inference",
+        "occupancy": result,
+        "point_data": {
+            "x_pos": payload.x_pos,
+            "y_pos": payload.y_pos,
+            "z_pos": payload.z_pos,
+            "snr": payload.snr,
+            "noise": payload.noise
+        }
+    })
+    await broadcast_to_clients(combined_message)
 
     return JSONResponse(content={
         "status": "ok", 
-        "clients": len(clients)
-    })
-
-@app.post("/fall")
-async def fall_hook(payload: RadarPayload):
-    """Process fall detection for HTTP requests."""
-    fall_result = fall_detector.process_frame({
-        "x_pos": payload.x_pos,
-        "y_pos": payload.y_pos,
-        "z_pos": payload.z_pos,
-        "snr": payload.snr,
-        "noise": payload.noise
-    })
-
-    if fall_result:
-        message = json.dumps({
-            "fall_detection": fall_result,
-            "point_data": {
-                "x_pos": payload.x_pos,
-                "y_pos": payload.y_pos,
-                "z_pos": payload.z_pos,
-                "snr": payload.snr,
-                "noise": payload.noise
-            }
-        })
-        await broadcast_to_clients(message)
-
-    return JSONResponse(content={
-        "status": "ok",
         "clients": len(clients)
     })
 
@@ -206,11 +117,19 @@ async def create_model_endpoint(payload: CreateModelPayload):
         models_dir = get_models_dir()
         os.makedirs(models_dir, exist_ok=True)
 
+
         loop = asyncio.get_event_loop()
         try:
             def progress_callback(data):
-                # Run the broadcast in the event loop
-                asyncio.create_task(broadcast_to_clients(json.dumps(data)))
+                # Run the broadcast in the event loop properly
+                try:
+                    future = asyncio.run_coroutine_threadsafe(
+                        broadcast_to_clients(json.dumps(data)), 
+                        loop
+                    )
+                    # Don't wait for the result to avoid blocking
+                except Exception as e:
+                    print(f"Error broadcasting progress: {e}")
             
             await loop.run_in_executor(
                     None, 
@@ -280,6 +199,103 @@ async def create_model_endpoint(payload: CreateModelPayload):
             content={
                 "status": "error",
                 "message": f"Failed to create model: {str(e)}"
+            }
+        )
+
+@app.post("/start_training")
+async def start_training_endpoint(payload: CreateModelPayload):
+    """Start model training with real-time progress updates."""
+    try:
+        # Send training start notification
+        start_message = json.dumps({
+            "event": "training_started",
+            "model_name": payload.name,
+            "total_epochs": payload.epochs,
+            "batch_size": payload.batch_size,
+            "learning_rate": payload.learning_rate
+        })
+        await broadcast_to_clients(start_message)
+
+        # Use absolute path for models directory
+        models_dir = get_models_dir()
+        os.makedirs(models_dir, exist_ok=True)
+
+        loop = asyncio.get_event_loop()
+        try:
+            # Create a progress callback function that broadcasts to WebSocket clients
+            def progress_callback(data):
+                # Run the broadcast in the event loop
+                asyncio.create_task(broadcast_to_clients(json.dumps(data)))
+            
+            await loop.run_in_executor(
+                    None, 
+                    create_model,
+                    payload.name,
+                    payload.num_classes,
+                    payload.data_dir,
+                    payload.epochs,
+                    payload.batch_size,
+                    payload.learning_rate,
+                    payload.weight_decay,
+                    progress_callback
+                )
+
+            model_path = os.path.join(models_dir, f"{payload.name}.pth")
+            if not os.path.exists(model_path):
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "status": "error",
+                        "message": "Model training completed but file not found"
+                    }
+                )
+            success = model_db.add_model(
+                    name=payload.name,
+                    file_path=model_path,
+                    num_classes=payload.num_classes,
+                    data_dir=payload.data_dir,
+                    epochs=payload.epochs,
+                    batch_size=payload.batch_size,
+                    learning_rate=payload.learning_rate,
+                    weight_decay=payload.weight_decay
+            )
+                
+            if success:
+                return JSONResponse(content={
+                    "status": "success",
+                    "message": f"Model '{payload.name}' trained and registered successfully",
+                    "model_info": {
+                        "name": payload.name,
+                        "file_path": model_path,
+                        "num_classes": payload.num_classes,
+                        "epochs": payload.epochs,
+                        "batch_size": payload.batch_size
+                    }
+                })
+            else:
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "status": "error",
+                        "message": "Model trained but failed to register in database"
+                    }
+                )
+                    
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": f"Model training failed: {str(e)}"
+                }
+            )
+                
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Failed to start training: {str(e)}"
             }
         )
 

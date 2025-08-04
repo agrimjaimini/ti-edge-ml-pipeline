@@ -157,14 +157,18 @@ def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_
     
     # Send completion notification
     if progress_callback:
-        completion_data = {
-            "event": "training_complete",
-            "model_name": name,
-            "final_train_loss": float(train_loss),
-            "final_val_loss": float(val_loss),
-            "final_val_accuracy": float(val_acc),
-            "model_path": model_path
-        }
-        progress_callback(completion_data)
+        try:
+            completion_data = {
+                "event": "training_complete",
+                "model_name": name,
+                "final_train_loss": float(train_loss),
+                "final_val_loss": float(val_loss),
+                "final_val_accuracy": float(val_acc),
+                "model_path": model_path
+            }
+            progress_callback(completion_data)
+        except Exception as e:
+            print(f"Error sending completion notification: {e}")
+            # Don't let broadcast errors prevent model saving
     
 
