@@ -7,6 +7,16 @@ export function AppProvider({ children }) {
   const [model, setModel] = useState(null);
   const [data, setData] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  
+  // Training progress state
+  const [trainingProgress, setTrainingProgress] = useState({
+    isTraining: false,
+    currentEpoch: 0,
+    totalEpochs: 0,
+    metrics: [],
+    modelName: '',
+    status: 'idle' // 'idle', 'training', 'completed', 'error'
+  });
 
   const value = {
     useCase,
@@ -16,7 +26,9 @@ export function AppProvider({ children }) {
     data,
     setData,
     isConnected,
-    setIsConnected
+    setIsConnected,
+    trainingProgress,
+    setTrainingProgress
   };
 
   return (

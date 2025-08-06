@@ -26,7 +26,7 @@ app.add_middleware(
 clients: List[WebSocket] = []
 
 class RadarPayload(BaseModel):
-    model_name: str
+    model_name: str = "default_model"  # Default value if not provided
     x_pos:    List[float]
     y_pos:    List[float]
     z_pos:    List[float]
@@ -224,8 +224,15 @@ async def start_training_endpoint(payload: CreateModelPayload):
         try:
             # Create a progress callback function that broadcasts to WebSocket clients
             def progress_callback(data):
-                # Run the broadcast in the event loop
-                asyncio.create_task(broadcast_to_clients(json.dumps(data)))
+                # Run the broadcast in the event loop from thread
+                try:
+                    future = asyncio.run_coroutine_threadsafe(
+                        broadcast_to_clients(json.dumps(data)), 
+                        loop
+                    )
+                    # Don't wait for the result to avoid blocking training
+                except Exception as e:
+                    print(f"Error broadcasting progress: {e}")
             
             await loop.run_in_executor(
                     None, 

@@ -226,6 +226,7 @@ void loop() {
         }
                             // send data out via MQTT
 
+              doc["model_name"] = "Occupancy Test";  // Use existing model
               doc["Frame Count: "] = frameCounter;
               doc["Time Stamp: "] = millis();
               doc["Num Points: "] = totalPoints;

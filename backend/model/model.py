@@ -124,6 +124,20 @@ def evaluate(model, loader, criterion, device):
 
 def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_size: int, learning_rate: float, weight_decay: float, progress_callback=None):
 
+    # Send training start notification
+    if progress_callback:
+        try:
+            start_data = {
+                "event": "training_started",
+                "model_name": name,
+                "total_epochs": epochs,
+                "batch_size": batch_size,
+                "learning_rate": learning_rate
+            }
+            progress_callback(start_data)
+        except Exception as e:
+            print(f"Error sending start notification: {e}")
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_loader, val_loader = get_dataloaders(data_dir, batch_size, num_points=128)
     model = PointNetClassifier(num_classes).to(device)
@@ -144,9 +158,11 @@ def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_
                 "model_name": name,
                 "epoch": epoch,
                 "total_epochs": epochs,
-                "train_loss": float(train_loss),
-                "val_loss": float(val_loss),
-                "val_accuracy": float(val_acc),
+                "metrics": {
+                    "train_loss": float(train_loss),
+                    "val_loss": float(val_loss),
+                    "val_accuracy": float(val_acc)
+                },
                 "progress_percent": (epoch / epochs) * 100
             }
             progress_callback(progress_data)
@@ -159,7 +175,7 @@ def create_model(name: str, num_classes: int, data_dir: str, epochs: int, batch_
     if progress_callback:
         try:
             completion_data = {
-                "event": "training_complete",
+                "event": "training_completed",
                 "model_name": name,
                 "final_train_loss": float(train_loss),
                 "final_val_loss": float(val_loss),

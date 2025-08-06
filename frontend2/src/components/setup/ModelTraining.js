@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
+import TrainingProgressChart from './TrainingProgressChart';
+import WebSocketHandler from '../common/WebSocketHandler';
 
 function ModelTraining({ onComplete }) {
   const [formData, setFormData] = useState({
@@ -21,7 +23,8 @@ function ModelTraining({ onComplete }) {
     setTraining(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/create_model', formData);
+      // Use start_training endpoint for real-time progress updates
+      const response = await axios.post('http://localhost:8000/start_training', formData);
       
       if (response.data.status === 'success') {
         onComplete(response.data.model_info);
@@ -45,6 +48,9 @@ function ModelTraining({ onComplete }) {
 
   return (
     <div className="space-y-6">
+      {/* WebSocket Handler for real-time training updates */}
+      <WebSocketHandler />
+      
       <div className="text-center">
         <h2 className="text-2xl font-bold mb-2">Configure Model Training</h2>
         <p className="text-gray-600">Set up your model training parameters</p>
@@ -176,6 +182,9 @@ function ModelTraining({ onComplete }) {
           {training ? 'Training...' : 'Start Training'}
         </button>
       </form>
+
+      {/* Training Progress Chart */}
+      <TrainingProgressChart />
     </div>
   );
 }
