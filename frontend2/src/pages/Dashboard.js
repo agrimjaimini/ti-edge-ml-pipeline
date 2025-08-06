@@ -4,11 +4,9 @@ import WebSocketHandler from '../components/common/WebSocketHandler';
 import MetricsPanel from '../components/dashboard/MetricsPanel';
 import VisualizationPanel from '../components/dashboard/VisualizationPanel';
 import StatusPanel from '../components/dashboard/StatusPanel';
-import { useCases } from '../config/useCases';
 
 function Dashboard() {
   const { useCase, model, data, setData } = useAppContext();
-  const config = useCases[useCase];
 
   useEffect(() => {
     // Redirect to setup if no use case is selected
@@ -17,14 +15,14 @@ function Dashboard() {
     }
   }, [useCase, model]);
 
-  if (!config) return null;
+  if (!useCase) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-8 font-sans">
       <header className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold">{config.name}</h1>
-          <p className="text-gray-500 text-sm">{config.description}</p>
+          <h1 className="text-3xl font-extrabold">{useCase.name}</h1>
+          <p className="text-gray-500 text-sm">{useCase.description}</p>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">Model: {model?.name}</span>
@@ -42,7 +40,7 @@ function Dashboard() {
       />
 
       <div className="grid grid-cols-3 gap-6 mb-10">
-        <MetricsPanel metrics={config.metrics} data={data} />
+        <MetricsPanel metrics={useCase.metrics} data={data} />
         <StatusPanel />
         <div className="rounded-2xl bg-white p-6 shadow-md">
           <h2 className="font-semibold text-gray-700 mb-1">Model Performance</h2>
@@ -53,7 +51,7 @@ function Dashboard() {
       </div>
 
       <VisualizationPanel
-        types={config.visualizations}
+        types={useCase.visualizations}
         data={data}
       />
     </div>
