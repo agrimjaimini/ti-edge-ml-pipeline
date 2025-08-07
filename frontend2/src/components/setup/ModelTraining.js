@@ -17,17 +17,22 @@ function ModelTraining({ onComplete }) {
   const [training, setTraining] = useState(false);
   const [error, setError] = useState(null);
 
+  const [trainingCompleted, setTrainingCompleted] = useState(false);
+  const [completedModelInfo, setCompletedModelInfo] = useState(null);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setTraining(true);
+    setTrainingCompleted(false);
 
     try {
       // Use start_training endpoint for real-time progress updates
       const response = await axios.post('http://localhost:8000/start_training', formData);
       
       if (response.data.status === 'success') {
-        onComplete(response.data.model_info);
+        setCompletedModelInfo(response.data.model_info);
+        setTrainingCompleted(true);
       } else {
         setError(response.data.message);
       }
@@ -35,6 +40,12 @@ function ModelTraining({ onComplete }) {
       setError(err.response?.data?.message || 'Failed to start training');
     } finally {
       setTraining(false);
+    }
+  };
+
+  const handleNext = () => {
+    if (completedModelInfo) {
+      onComplete(completedModelInfo);
     }
   };
 
@@ -170,17 +181,27 @@ function ModelTraining({ onComplete }) {
 
         <button
           type="submit"
-          disabled={training}
+          disabled={training || trainingCompleted}
           className={`
             w-full py-2 px-4 rounded-md text-white font-medium
-            ${training
+            ${training || trainingCompleted
               ? 'bg-blue-400 cursor-not-allowed'
               : 'bg-blue-600 hover:bg-blue-700'
             }
           `}
         >
-          {training ? 'Training...' : 'Start Training'}
+          {training ? 'Training...' : trainingCompleted ? 'Training Complete' : 'Start Training'}
         </button>
+
+        {/* Next Button - shown when training is completed */}
+        {trainingCompleted && (
+          <button
+            onClick={handleNext}
+            className="w-full py-2 px-4 rounded-md bg-green-600 hover:bg-green-700 text-white font-medium mt-4"
+          >
+            Next: Configure Use Case
+          </button>
+        )}
       </form>
 
       {/* Training Progress Chart */}

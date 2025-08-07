@@ -48,15 +48,19 @@ function TrainingProgressChart() {
       {/* Training Progress Line Chart */}
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+          <LineChart data={chartData} margin={{ top: 20, right: 30, left: 40, bottom: 60 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis 
               dataKey="epoch" 
-              label={{ value: 'Epoch', position: 'insideBottom', offset: -10 }}
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              label={{ value: 'Epochs', position: 'insideBottom', offset: -10 }}
               stroke="#6b7280"
             />
             <YAxis 
-              label={{ value: 'Loss', angle: -90, position: 'insideLeft' }}
+              type="number"
+              domain={['auto', 'auto']}
+              label={{ value: 'Loss Value', angle: -90, position: 'insideLeft' }}
               stroke="#6b7280"
             />
             <Tooltip 
@@ -80,8 +84,9 @@ function TrainingProgressChart() {
               stroke="#3b82f6" 
               strokeWidth={3}
               name="Training Loss"
-              dot={{ r: 4, fill: '#3b82f6' }}
-              activeDot={{ r: 6, fill: '#1d4ed8' }}
+              dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: '#1d4ed8', strokeWidth: 2, stroke: '#ffffff' }}
+              connectNulls={true}
             />
             <Line 
               type="monotone" 
@@ -89,8 +94,9 @@ function TrainingProgressChart() {
               stroke="#ef4444" 
               strokeWidth={3}
               name="Validation Loss"
-              dot={{ r: 4, fill: '#ef4444' }}
-              activeDot={{ r: 6, fill: '#dc2626' }}
+              dot={{ r: 4, fill: '#ef4444', strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: '#dc2626', strokeWidth: 2, stroke: '#ffffff' }}
+              connectNulls={true}
             />
           </LineChart>
         </ResponsiveContainer>
