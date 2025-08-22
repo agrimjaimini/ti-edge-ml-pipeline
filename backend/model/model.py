@@ -41,8 +41,8 @@ class TNet(nn.Module):
 class PointNetClassifier(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
-        self.input_tnet = TNet(k=5)  # Changed from k=3 to k=5 for 5D input
-        self.conv1 = nn.Conv1d(5, 64, 1)  # Changed from 3 to 5 input channels
+        self.input_tnet = TNet(k=5)  
+        self.conv1 = nn.Conv1d(5, 64, 1)  
         self.bn1   = nn.BatchNorm1d(64)
 
         self.feature_tnet = TNet(k=64)
